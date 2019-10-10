@@ -5,6 +5,9 @@
 #include <list.h>
 #include <stdint.h>
 
+/* List of all threads that are blocked. */
+struct list blocked_list;
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -88,6 +91,7 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
+    int64_t blocked_ticks;              /* If the thread is blocked, it will be unblock after blocked ticks. */       
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
@@ -113,6 +117,8 @@ size_t threads_ready(void);
 
 void thread_tick (void);
 void thread_print_stats (void);
+void set_thread_blocked_ticks(struct thread *t, int64_t ticks);
+void unblock_thread_with_enough_ticks(int64_t ticks);
 
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
