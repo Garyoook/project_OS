@@ -92,6 +92,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&blocked_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -257,6 +258,31 @@ thread_unblock (struct thread *t)
   intr_set_level (old_level);
 }
 
+/* Helper function for unblock_thread_with_enough_ticks. 
+Checks util the thread is not ready to be unlocked. */
+static void
+repeated_check_blocked_list(struct list *list, int64_t ticks)
+{
+  if (!list_empty(list)) {
+    struct thread * front_thread = 
+    list_entry(list_front(list),struct thread, elem);
+    
+    if (front_thread->blocked_ticks <= ticks) {
+      list_remove(&front_thread->elem);
+      thread_unblock(front_thread);
+      repeated_check_blocked_list(list, ticks);
+    }
+  }
+}
+
+/* Begin with the first thread in the blocked list, 
+to check whether it's time for blocked threads to be unlocked. */
+void 
+unblock_thread_with_enough_ticks(int64_t ticks)
+{
+  repeated_check_blocked_list(&blocked_list, ticks);
+}
+
 /* Returns the name of the running thread. */
 const char *
 thread_name (void) 
@@ -344,6 +370,13 @@ thread_foreach (thread_action_func *func, void *aux)
       struct thread *t = list_entry (e, struct thread, allelem);
       func (t, aux);
     }
+}
+
+/* Set the estimated ticks that the thread will be released. */
+void
+set_thread_blocked_ticks(struct thread *t, int64_t ticks)
+{
+  t->blocked_ticks = ticks;
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
