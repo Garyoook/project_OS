@@ -91,6 +91,8 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
+    int current_priority_donation_depth; /* Current priorit donation depth. */
+    int previous_priorities[8];         /* To store priorities after priority donation. */
     int64_t blocked_ticks;              /* If the thread is blocked, it will be unblock after blocked ticks. */       
     struct list_elem allelem;           /* List element for all threads list. */
 

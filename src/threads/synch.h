@@ -41,6 +41,9 @@ void cond_wait (struct condition *, struct lock *);
 void cond_signal (struct condition *, struct lock *);
 void cond_broadcast (struct condition *, struct lock *);
 
+/* The limitation of depth of nested priority donation. */
+#define NESTED_PRIORITY_DONATION_DEPTH 8
+
 /* Optimization barrier.
 
    The compiler will not reorder operations across an
