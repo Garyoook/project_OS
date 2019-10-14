@@ -1,0 +1,3 @@
+/homes/yg9418/Downloads/Pintos/pintos_47/cmake-build-debug/CMakeFiles/edit_cache.dir
+/homes/yg9418/Downloads/Pintos/pintos_47/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/homes/yg9418/Downloads/Pintos/pintos_47/cmake-build-debug/CMakeFiles/pintos_47.dir
