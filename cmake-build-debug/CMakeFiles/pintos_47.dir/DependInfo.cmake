@@ -247,6 +247,7 @@ set(CMAKE_C_TARGET_INCLUDE_PATH
   "../src/tests/vm"
   "../src/threads"
   "../src/userprog"
+  "../src"
   )
 
 # Targets to which this target links.

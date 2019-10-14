@@ -60,6 +60,7 @@
 					<Add directory="/homes/yg9418/Downloads/Pintos/pintos_47/src/tests/vm"/>
 					<Add directory="/homes/yg9418/Downloads/Pintos/pintos_47/src/threads"/>
 					<Add directory="/homes/yg9418/Downloads/Pintos/pintos_47/src/userprog"/>
+					<Add directory="/homes/yg9418/Downloads/Pintos/pintos_47/src"/>
 					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
 					<Add directory="/usr/local/include"/>
 					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
@@ -96,6 +97,7 @@
 					<Add directory="/homes/yg9418/Downloads/Pintos/pintos_47/src/tests/vm"/>
 					<Add directory="/homes/yg9418/Downloads/Pintos/pintos_47/src/threads"/>
 					<Add directory="/homes/yg9418/Downloads/Pintos/pintos_47/src/userprog"/>
+					<Add directory="/homes/yg9418/Downloads/Pintos/pintos_47/src"/>
 					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
 					<Add directory="/usr/local/include"/>
 					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
