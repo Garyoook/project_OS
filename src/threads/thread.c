@@ -19,7 +19,7 @@
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
-
+bool compare_thread_priority(const struct list_elem *e1, const struct list_elem *e2, void *U);
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
@@ -255,6 +255,11 @@ thread_unblock (struct thread *t)
   ASSERT (t->status == THREAD_BLOCKED);
   list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
+
+  if (t->priority > thread_current()->priority){
+    thread_yield();
+  }
+
   intr_set_level (old_level);
 }
 
@@ -384,6 +389,12 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+  int highest_priority_in_readylist =
+      list_entry(list_max(&ready_list, compare_thread_priority, NULL), struct thread, elem)->priority;
+  if (new_priority < highest_priority_in_readylist){
+    thread_yield();
+  }
+
 }
 
 /* Returns the current thread's priority. */
@@ -535,13 +546,20 @@ alloc_frame (struct thread *t, size_t size)
    empty.  (If the running thread can continue running, then it
    will be in the run queue.)  If the run queue is empty, return
    idle_thread. */
+bool compare_thread_priority1(const struct list_elem *e1, const struct list_elem *e2, void *U)
+{
+  struct thread *t1 = list_entry(e1, struct thread, elem);
+  struct thread *t2 = list_entry(e2, struct thread, elem);
+  return ((t1->priority) > (t2->priority));
+}
+
 static struct thread *
 next_thread_to_run (void) 
 {
   if (list_empty (&ready_list))
     return idle_thread;
   else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+    return list_entry(list_max(&ready_list, compare_thread_priority1, NULL), struct thread, elem);
 }
 
 /* Completes a thread switch by activating the new thread's page

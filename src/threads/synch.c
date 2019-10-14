@@ -105,6 +105,12 @@ sema_try_down (struct semaphore *sema)
    and wakes up one thread of those waiting for SEMA, if any.
 
    This function may be called from an interrupt handler. */
+bool compare_thread_priority(const struct list_elem *e1, const struct list_elem *e2, void *U)
+{
+  struct thread *t1 = list_entry(e1, struct thread, elem);
+  struct thread *t2 = list_entry(e2, struct thread, elem);
+  return ((t1->priority) > (t2->priority));
+}
 void
 sema_up (struct semaphore *sema) 
 {
@@ -114,8 +120,7 @@ sema_up (struct semaphore *sema)
 
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+    thread_unblock (list_entry(list_max(&sema->waiters, compare_thread_priority, NULL), struct thread, elem));
   sema->value++;
   intr_set_level (old_level);
 }
