@@ -352,7 +352,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    thread_into_ready_list_with_priority(cur);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -414,11 +414,9 @@ into ready list firstly. */
 void
 thread_into_ready_list_with_priority(struct thread *t)
 {
-  if (thread_get_priority() > t->priority) {
+  if (thread_get_priority() > highest_priority_at_the_moment()) {
     if (t != idle_thread) 
       list_push_back(&ready_list, &t->elem);
-    t->status = THREAD_READY;
-    schedule();
   } else {
      struct thread *cur = running_thread ();
      struct thread *prev = NULL;
@@ -428,11 +426,11 @@ thread_into_ready_list_with_priority(struct thread *t)
      cur->status = THREAD_READY;
      
      ASSERT (intr_get_level () == INTR_OFF);
-     ASSERT (t->status != THREAD_RUNNING);
+     ASSERT (cur->status != THREAD_RUNNING);
      ASSERT (is_thread (t));
      
-     if (t != cur)
-       prev = switch_threads (t, cur);
+     if (cur != t)
+       prev = switch_threads (cur, t);
      thread_schedule_tail (prev);
   }
 }
