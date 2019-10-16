@@ -79,7 +79,7 @@ void thread_schedule_tail(struct thread *prev);
 
 static tid_t allocate_tid(void);
 
-bool compare_priority(const struct list_elem *e1, const struct list_elem *e2, void *U);
+bool compare_priority(const struct list_elem *e1, const struct list_elem *e2, void *aux);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -257,10 +257,11 @@ thread_unblock(struct thread *t) {
     ASSERT (t->status == THREAD_BLOCKED);
     list_push_back(&ready_list, &t->elem);
 
-//    if it has a higher priority;
-    if (t->priority > thread_current()->priority) {
-        thread_yield();
-    }
+////newly added in Task1:    if it has a higher priority;
+//    if (t->priority > thread_get_priority()) {
+//        thread_yield();
+//    }
+
 
     t->status = THREAD_READY;
     intr_set_level(old_level);
@@ -530,18 +531,24 @@ next_thread_to_run(void) {
     if (list_empty(&ready_list))
         return idle_thread;
     else {
-        return list_entry (list_max(&ready_list, compare_priority, NULL), struct thread, elem);
+//        newly modified in Task1:
+        struct list_elem *e = list_max(&ready_list, compare_priority, NULL);
+        struct thread *t = list_entry (e, struct thread, elem);
+        list_remove(e);
+        return t;
+//
     }
 }
 
 
 /* New function: Returns true if priority for t1 is bigger than priority for t2 */
-bool compare_priority(const struct list_elem *e1, const struct list_elem *e2, void *U)
+bool compare_priority(const struct list_elem *e1, const struct list_elem *e2, void *aux UNUSED)
 {
     struct thread *t1 = list_entry(e1, struct thread, elem);
     struct thread *t2 = list_entry(e2, struct thread, elem);
     return t1->priority < t2->priority;
 }
+//
 
 /* Completes a thread switch by activating the new thread's page
    tables, and, if the previous thread is dying, destroying it.

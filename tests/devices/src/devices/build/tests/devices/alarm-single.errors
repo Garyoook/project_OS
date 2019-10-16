@@ -1,0 +1,2 @@
+Use of uninitialized value in numeric le (<=) at /homes/yg9418/Downloads/Pintos/pintos_47/tests/../src/utils/pintos line 828.
+qemu-system-i386: terminating on signal 2
