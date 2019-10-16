@@ -1,9 +1,0 @@
-qemu-system-i386 -drive file=/tmp/bBJQmZIf1l.dsk,index=0,media=disk,format=raw -m 4 -net none -nographic -monitor null --no-kvm
-PiLo hda1
-Loading........
-Kernel command line: -q run alarm-single
-Pintos booting with 3,968 kB RAM...
-367 pages available in kernel pool.
-367 pages available in user pool.
-
-TIMEOUT after 60 seconds of host CPU time
