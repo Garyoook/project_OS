@@ -87,7 +87,7 @@ timer_elapsed (int64_t then)
 }
 
 /* Returns true if ticks for t1 is smaller than ticks for t2 */
-bool compare_thread(const struct list_elem *e1, const struct list_elem *e2, void *U)
+bool compare_thread(const struct list_elem *e1, const struct list_elem *e2, void *aux UNUSED)
 {
   struct thread *t1 = list_entry(e1, struct thread, elem); 
   struct thread *t2 = list_entry(e2, struct thread, elem);
