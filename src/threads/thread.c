@@ -148,6 +148,9 @@ thread_tick (void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
+
+  if (t->priority < list_entry(list_max(&ready_list, compare_thread_by_priority, NULL), struct thread, elem)->priority)
+    thread_yield();
 }
 
 /* Prints thread statistics. */
@@ -256,8 +259,14 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  thread_into_ready_list_with_priority(t);
+  
+  list_push_back(&ready_list, &t->elem);
   t->status = THREAD_READY;
+
+  if (t->priority > thread_get_priority()) {
+    thread_yield();
+  }
+
   intr_set_level (old_level);
 }
 
@@ -352,7 +361,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    thread_into_ready_list_with_priority(cur);
+    list_push_back(&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -396,72 +405,13 @@ thread_get_priority (void)
   return thread_current ()->priority;
 }
 
-int 
-highest_priority_at_the_moment()
-{
-  int highest_priority_in_ready_list = 
-  list_entry (list_max(&ready_list, compare_thread_by_priority, NULL), struct thread, elem)->priority;
-  if (highest_priority_in_ready_list > thread_get_priority()) {
-    return highest_priority_in_ready_list;
-  }
-  return thread_get_priority();
-}
-
-
-/* Checking the priority the thread that is needed to be added 
-into ready list firstly. */
-
-void
-thread_into_ready_list_with_priority(struct thread *t)
-{
-  if (thread_get_priority() > highest_priority_at_the_moment()) {
-    if (t != idle_thread) 
-      list_push_back(&ready_list, &t->elem);
-  } else {
-     struct thread *cur = running_thread ();
-     struct thread *prev = NULL;
-
-     if (cur != idle_thread) 
-       list_push_back (&ready_list, &cur->elem);
-     cur->status = THREAD_READY;
-     
-     ASSERT (intr_get_level () == INTR_OFF);
-     ASSERT (cur->status != THREAD_RUNNING);
-     ASSERT (is_thread (t));
-     
-     if (cur != t)
-       prev = switch_threads (cur, t);
-     thread_schedule_tail (prev);
-  }
-}
-
-
-/* Helper function for next_thread_to_run.
-Returns true if priority for t1 is smaller than ticks for t2 */
+/* Helper function that returns true if priority for t1 is smaller than ticks for t2 */
 bool 
 compare_thread_by_priority(const struct list_elem *e1, const struct list_elem *e2, void *U)
 {
   struct thread *t1 = list_entry(e1, struct thread, elem); 
   struct thread *t2 = list_entry(e2, struct thread, elem);
-  return t1->priority > t2->priority; 
-}
-
-/* Enable thread to increment its priority */
-void
-thread_increment(struct thread *t) 
-{
-  t->priority++;
-}
-
-/* Enable thread to decrement its priority. If the new priority is less
-than the highest priority in the ready list, just yeild the thread. */
-void
-thread_decrement(struct thread *t) 
-{
-  t->priority--;
-  if (t->priority < highest_priority_at_the_moment) {
-    thread_yield();
-  }
+  return t1->priority < t2->priority; 
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -484,7 +434,7 @@ int
 thread_get_load_avg (void) 
 {
   /* Not yet implemented. */
-  return 0;
+  return 0; 
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
@@ -610,10 +560,15 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void) 
 {
-  if (list_empty (&ready_list))
+  if (list_empty (&ready_list)) {
     return idle_thread;
-  else
-    return list_entry (list_max(&ready_list, compare_thread_by_priority, NULL), struct thread, elem);
+    }
+    struct list_elem *e = list_max(&ready_list, compare_thread_by_priority, NULL);
+    struct thread *t = list_entry (e, struct thread, elem);
+    list_remove(e);
+
+    return t;
+
 }
 
 /* Completes a thread switch by activating the new thread's page

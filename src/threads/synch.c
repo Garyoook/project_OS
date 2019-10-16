@@ -61,8 +61,8 @@ void
 sema_down (struct semaphore *sema) 
 {
   enum intr_level old_level;
-  int priority_donation;
-  int donation_depth = thread_current()->current_priority_donation_depth;
+  struct thread *pre;
+  struct thread *cur;
 
   ASSERT (sema != NULL);
   ASSERT (!intr_context ());
@@ -71,14 +71,15 @@ sema_down (struct semaphore *sema)
   while (sema->value == 0) 
     {
       list_push_back (&sema->waiters, &thread_current ()->elem);
-      priority_donation = thread_current()->priority;
-      (thread_current()->current_priority_donation_depth)++;
+      pre = thread_current();
       thread_block ();
-
-      if (donation_depth < NESTED_PRIORITY_DONATION_DEPTH) {
-        thread_current()->previous_priorities[donation_depth] = thread_current()->priority;
-        thread_current()->priority = priority_donation;
-        (thread_current()->current_priority_donation_depth)++;
+      cur = thread_current();
+      
+      if (pre->current_priority_donation_depth < NESTED_PRIORITY_DONATION_DEPTH && 
+          pre->priority > cur->priority) {
+        cur->previous_priorities[cur->current_priority_donation_depth] = cur->priority;
+        cur->current_priority_donation_depth++;
+        cur->priority = pre->priority;
       }
     }
   sema->value--;
@@ -119,19 +120,18 @@ void
 sema_up (struct semaphore *sema) 
 {
   enum intr_level old_level;
-  int donation_priority;
+  struct thread *pre;
 
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters)) {
-    donation_priority = thread_current()->priority;
-    thread_current()->priority = thread_current()->previous_priorities[thread_current()->current_priority_donation_depth];
-    (thread_current()->current_priority_donation_depth)--;
+    pre = thread_current();
+    pre->priority = pre->previous_priorities[pre->current_priority_donation_depth];
+    pre->current_priority_donation_depth--;
     thread_unblock (list_entry (list_pop_front (&sema->waiters),
                                 struct thread, elem));
-    thread_current()->priority = donation_priority;
-    (thread_current()->current_priority_donation_depth)--;
+    
   }
   sema->value++;
   intr_set_level (old_level);
