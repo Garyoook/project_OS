@@ -358,6 +358,11 @@ thread_yield(void) {
     cur->status = THREAD_READY;
     schedule();
     intr_set_level(old_level);
+
+    if (cur->priority < list_entry(list_max(&ready_list, compare_priority, NULL),
+        struct thread, elem)->priority) {
+      thread_yield();
+    }
 }
 
 /* Invoke function 'func' on all threads, passing along 'aux'.
@@ -538,7 +543,8 @@ next_thread_to_run(void) {
         struct list_elem *e = list_max(&ready_list, compare_priority, NULL);
         struct thread *t = list_entry (e, struct thread, elem);
         list_remove(e);
-        return t;
+
+       return t;
 //
     }
 }
