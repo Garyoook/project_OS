@@ -221,6 +221,10 @@ thread_create(const char *name, int priority,
     /* Add to run queue. */
     thread_unblock(t);
 
+    if (t->priority > thread_get_priority()){
+      thread_yield();
+    }
+
     return tid;
 }
 
@@ -249,22 +253,18 @@ thread_block(void) {
    update other data. */
 void
 thread_unblock(struct thread *t) {
+
     enum intr_level old_level;
 
     ASSERT (is_thread(t));
 
-    old_level = intr_disable();
-    ASSERT (t->status == THREAD_BLOCKED);
-    list_push_back(&ready_list, &t->elem);
 
-////newly added in Task1:    if it has a higher priority;
-//    if (t->priority > thread_get_priority()) {
-//        thread_yield();
-//    }
+  old_level = intr_disable();
+  ASSERT (t->status == THREAD_BLOCKED);
+  list_push_back(&ready_list, &t->elem);
+  t->status = THREAD_READY;
+  intr_set_level(old_level);
 
-
-    t->status = THREAD_READY;
-    intr_set_level(old_level);
 }
 
 //
@@ -352,6 +352,7 @@ thread_yield(void) {
     ASSERT (!intr_context());
 
     old_level = intr_disable();
+
     if (cur != idle_thread)
         list_push_back(&ready_list, &cur->elem);
     cur->status = THREAD_READY;
@@ -383,10 +384,11 @@ set_thread_blocked_ticks(struct thread *t, int64_t ticks) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority(int new_priority) {
+  thread_current()->priority = new_priority;
     if (new_priority < list_entry (list_max(&ready_list, compare_priority, NULL), struct thread, elem)->priority) {
         thread_yield();
     }
-    thread_current()->priority = new_priority;
+
 }
 
 /* Returns the current thread's priority. */
@@ -502,6 +504,7 @@ init_thread(struct thread *t, const char *name, int priority) {
     strlcpy(t->name, name, sizeof t->name);
     t->stack = (uint8_t *) t + PGSIZE;
     t->priority = priority;
+    t->priorities[0] = priority;
     t->magic = THREAD_MAGIC;
 
     old_level = intr_disable();
@@ -546,7 +549,7 @@ bool compare_priority(const struct list_elem *e1, const struct list_elem *e2, vo
 {
     struct thread *t1 = list_entry(e1, struct thread, elem);
     struct thread *t2 = list_entry(e2, struct thread, elem);
-    return t1->priority < t2->priority;
+    return t1->priority <= t2->priority;
 }
 //
 
