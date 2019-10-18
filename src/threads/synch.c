@@ -199,8 +199,26 @@ lock_acquire(struct lock *lock) {
   ASSERT (!lock_held_by_current_thread(lock));
 
   if (lock->holder != NULL) {
+
+    if (!list_empty(&lock->semaphore.waiters)){
+      int thisPrior =
+          list_entry(list_max(&lock->semaphore.waiters, compare_priority, NULL), struct thread, elem)->priority;
+
+      if (thread_get_priority() > thisPrior) {
+        for (int i = 0; i < 8; i++) {
+          if (lock->holder->priorities[i] == thisPrior) {
+            lock->holder->priorities[i] = thread_get_priority();
+            break;
+          }
+        }
+      }
+
+    } else {
+      lock->holder->priorities[lock->holder->currentPos] = thread_get_priority();
+      lock->holder->currentPos++;
+    }
+
     if (thread_get_priority() > lock->holder->priority) {
-      lock->holder->priorities[0] = lock->holder->priority;
       lock->holder->priority = thread_get_priority();
     }
   }
@@ -258,11 +276,32 @@ lock_try_acquire(struct lock *lock) {
 void
 lock_release(struct lock *lock) {
 
+
+  int thisPrior =
+      list_entry(list_max(&lock->semaphore.waiters, compare_priority, NULL), struct thread, elem)->priority;
+
+  for (int i = 0; i < 8; i++) {
+    if (lock->holder->priorities[i] == thisPrior) {
+      lock->holder->priorities[i] = 0;
+      break;
+    }
+  }
+
+  int newPrior;
+  newPrior = 0;
+
+  for (int i = 0; i < 8; i++) {
+    if (lock->holder->priorities[i] > newPrior) {
+      newPrior = lock->holder->priorities[i];
+    }
+  }
+
+
   lock->holder = NULL;
 
   sema_up(&lock->semaphore);
 
-  thread_set_priority(thread_current()->priorities[0]);
+  thread_set_priority(newPrior);
 
 
 }

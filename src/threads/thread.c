@@ -394,7 +394,9 @@ set_thread_blocked_ticks(struct thread *t, int64_t ticks) {
 void
 thread_set_priority(int new_priority) {
   thread_current()->priority = new_priority;
-  if (new_priority < list_entry (list_max(&ready_list, compare_priority, NULL), struct thread, elem)->priority) {
+
+  if ((new_priority < list_entry (list_max(&ready_list, compare_priority, NULL), struct thread, elem)->priority)
+  && (!list_empty(&ready_list))){
     thread_yield();
   }
 
@@ -525,10 +527,16 @@ init_thread(struct thread *t, const char *name, int priority) {
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
 //  to initialise added field "priorities";
-  for (int i = 0; i < 8; i++) {
-    t->priorities[i] = priority;
+  for (int i = 1; i < 8; i++) {
+    t->priorities[i] = 0;
   }
+
+  for (int i = 0; i < 8; i++){
+    t->donateTo = NULL;
+  }
+  t->priorities[0] = t->priority;
   t->magic = THREAD_MAGIC;
+  t->currentPos = 1;
 
   old_level = intr_disable();
   list_push_back(&all_list, &t->allelem);
