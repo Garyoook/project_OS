@@ -391,10 +391,28 @@ set_thread_blocked_ticks(struct thread *t, int64_t ticks) {
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
+void upDate_donate_chain(struct thread *t, int new_priority){
+  if ((t != NULL) && (t->donateTo != NULL))
+  {
+    struct thread *donater = list_entry((t->donateTo), struct thread, elem);
+
+    if (t->priority == donater->priority) {
+      upDate_donate_chain(donater, new_priority);
+      donater->priority = new_priority;
+    } else {
+      for (int i = 0; i < 8; i++) {
+        if (donater->priorities[i] == t->priority) {
+          donater->priorities[i] = new_priority;
+        }
+      }
+    }
+  }
+}
+
 void
 thread_set_priority(int new_priority) {
+  upDate_donate_chain(thread_current(), new_priority);
   thread_current()->priority = new_priority;
-
   if ((new_priority < list_entry (list_max(&ready_list, compare_priority, NULL), struct thread, elem)->priority)
   && (!list_empty(&ready_list))){
     thread_yield();
@@ -406,7 +424,7 @@ thread_set_priority(int new_priority) {
 int
 thread_get_priority(void) {
   struct thread *cur = thread_current();
-  int max = 0;
+/*  int max = 0;
   for (int i = 0; i < 8; i++) {
     if (cur->priorities[i] > max) {
       max = cur->priorities[i];
@@ -415,7 +433,8 @@ thread_get_priority(void) {
   if (cur->priority > max) {
     max = cur->priority;
   }
-  return max;
+  */
+  return cur->priority;
 
 }
 
@@ -531,9 +550,8 @@ init_thread(struct thread *t, const char *name, int priority) {
     t->priorities[i] = 0;
   }
 
-  for (int i = 0; i < 8; i++){
-    t->donateTo = NULL;
-  }
+  t->donateTo = NULL;
+
   t->priorities[0] = t->priority;
   t->magic = THREAD_MAGIC;
   t->currentPos = 1;

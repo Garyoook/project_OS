@@ -192,6 +192,24 @@ lock_init(struct lock *lock) {
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
+void upDate_donate_chain1(struct thread *t, int new_priority){
+  if ((t != NULL) && (t->donateTo != NULL))
+  {
+    struct thread *donater = list_entry((t->donateTo), struct thread, elem);
+
+    if (t->priority == donater->priority) {
+      upDate_donate_chain1(donater, new_priority);
+      donater->priority = new_priority;
+    } else {
+      for (int i = 0; i < 8; i++) {
+        if (donater->priorities[i] == t->priority) {
+          donater->priorities[i] = new_priority;
+        }
+      }
+    }
+  }
+}
+
 void
 lock_acquire(struct lock *lock) {
   ASSERT (lock != NULL);
@@ -199,6 +217,8 @@ lock_acquire(struct lock *lock) {
   ASSERT (!lock_held_by_current_thread(lock));
 
   if (lock->holder != NULL) {
+
+    upDate_donate_chain1(lock->holder, thread_get_priority());
 
     if (!list_empty(&lock->semaphore.waiters)){
       int thisPrior =
@@ -221,6 +241,8 @@ lock_acquire(struct lock *lock) {
     if (thread_get_priority() > lock->holder->priority) {
       lock->holder->priority = thread_get_priority();
     }
+
+    thread_current()->donateTo = &lock->holder->elem;
   }
 
   sema_down(&lock->semaphore);
@@ -228,23 +250,6 @@ lock_acquire(struct lock *lock) {
 
   lock->holder = thread_current();
 
-
-
-
-
-  /*
-
-  lock->holder->priorities[0] = lock->holder->priority;
-  if (!list_empty(&(lock->semaphore.waiters))){
-
-    int lockPriority = (lock->holder->priority);
-    int waitersPriority = (list_entry(list_max(&(lock->semaphore.waiters), compare_priority, NULL), struct thread, elem)->priority);
-
-//    if (waitersPriority > lockPriority){
-      lock->holder->priority = waitersPriority;
-      */
-//    }
-//  }
 
 
 }
