@@ -40,9 +40,9 @@ static struct lock tid_lock;
 
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame {
-    void *eip;                  /* Return address. */
-    thread_func *function;      /* Function to call. */
-    void *aux;                  /* Auxiliary data for function. */
+  void *eip;                  /* Return address. */
+  thread_func *function;      /* Function to call. */
+  void *aux;                  /* Auxiliary data for function. */
 };
 
 /* Statistics. */
@@ -133,6 +133,10 @@ threads_ready(void) {
 }
 
 /* Called by the timer interrupt handler at each timer tick.
+ *
+ *
+ *
+ *
    Thus, this function runs in an external interrupt context. */
 void
 thread_tick(void) {
