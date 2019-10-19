@@ -413,6 +413,15 @@ void
 thread_set_priority(int new_priority) {
   upDate_donate_chain(thread_current(), new_priority);
   thread_current()->priority = new_priority;
+  /*
+  int newPrior = 0;
+  for (int i = 0; i < 8; i++){
+    if (thread_current()->priorities[i] > newPrior){
+      newPrior = thread_current()->priorities[i];
+    }
+  }
+  thread_current()->priority = newPrior*/
+
   if ((new_priority < list_entry (list_max(&ready_list, compare_priority, NULL), struct thread, elem)->priority)
   && (!list_empty(&ready_list))){
     thread_yield();

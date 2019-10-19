@@ -200,13 +200,15 @@ void upDate_donate_chain1(struct thread *t, int new_priority){
     if (t->priority == donater->priority) {
       upDate_donate_chain1(donater, new_priority);
       donater->priority = new_priority;
-    } else {
-      for (int i = 0; i < 8; i++) {
-        if (donater->priorities[i] == t->priority) {
-          donater->priorities[i] = new_priority;
-        }
+    }
+
+
+    for (int i = 0; i < 8; i++) {
+      if (donater->priorities[i] == t->priority) {
+        donater->priorities[i] = new_priority;
       }
     }
+
   }
 }
 
