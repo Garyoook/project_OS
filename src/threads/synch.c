@@ -308,7 +308,11 @@ lock_release(struct lock *lock) {
 
   sema_up(&lock->semaphore);
 
-  thread_set_priority(newPrior);
+  thread_current()->priority = newPrior;
+  if ((newPrior < list_entry (list_max(get_ready_list(), compare_priority, NULL), struct thread, elem)->priority)
+      && (!list_empty(get_ready_list()))){
+    thread_yield();
+  }
 
 
 }
