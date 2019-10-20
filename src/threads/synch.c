@@ -200,33 +200,26 @@ lock_acquire(struct lock *lock) {
 
   if (lock->holder != NULL) {
     if (thread_get_priority() > lock->holder->priority) {
-      lock->holder->priorities[0] = lock->holder->priority;
-      lock->holder->priority = thread_get_priority();
+      struct thread *cur = thread_current();
+      lock->holder->base_priority = lock->holder->priority;
+      lock->holder->priority = cur->priority;
+      if (!list_empty(&cur->donate_to_list) && !list_empty(&lock->holder->donated_from_list)) {
+        list_insert_ordered(&lock->holder->donated_from_list, &cur->elem, compare_priority, NULL);
+        list_insert_ordered(&cur->donate_to_list, &lock->holder->elem, compare_priority, NULL);
+      }
+
+
+
+////      lock->holder->nested_prev = &thread_current()->elem;
+//      thread_current()->nested_next = &lock->holder->elem;
+//
+//      lock->holder->base_priority = lock->holder->priority;
+//      lock->holder->priority = thread_current()->priority;
     }
   }
 
   sema_down(&lock->semaphore);
-
-
   lock->holder = thread_current();
-
-
-
-
-
-  /*
-
-  lock->holder->priorities[0] = lock->holder->priority;
-  if (!list_empty(&(lock->semaphore.waiters))){
-
-    int lockPriority = (lock->holder->priority);
-    int waitersPriority = (list_entry(list_max(&(lock->semaphore.waiters), compare_priority, NULL), struct thread, elem)->priority);
-
-//    if (waitersPriority > lockPriority){
-      lock->holder->priority = waitersPriority;
-      */
-//    }
-//  }
 
 
 }
@@ -262,7 +255,7 @@ lock_release(struct lock *lock) {
 
   sema_up(&lock->semaphore);
 
-  thread_set_priority(thread_current()->priorities[0]);
+  thread_set_priority(thread_current()->base_priority);
 
 
 }

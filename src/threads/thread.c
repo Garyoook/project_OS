@@ -405,14 +405,32 @@ int
 thread_get_priority(void) {
   struct thread *cur = thread_current();
   int max = 0;
-  for (int i = 0; i < 8; i++) {
-    if (cur->priorities[i] > max) {
-      max = cur->priorities[i];
+
+//  for (int i = 0; i < 8; i++) {
+//    if (cur->priorities[i] > max) {
+//      max = cur->priorities[i];
+//    }
+//  }
+//
+//  while (cur->nested_next != NULL) {
+//    struct thread *next_thr = list_entry(cur->nested_next, struct thread, elem);
+//    int next_pri = next_thr->priority;
+//    if (next_pri > max) {
+//      max = next_pri;
+//    }
+//    cur = next_thr;
+//  }
+  if (!list_empty(&cur->donated_from_list)) {
+    int new_pri = list_entry(list_pop_front(&cur->donated_from_list), struct thread, elem)->priority;
+    if (new_pri > max) {
+      max = new_pri;
     }
   }
+
   if (cur->priority > max) {
     max = cur->priority;
   }
+
   return max;
 
 }
@@ -525,9 +543,17 @@ init_thread(struct thread *t, const char *name, int priority) {
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
 //  to initialise added field "priorities";
+  t->nested_level = 0;
+  t->base_priority = priority;
   for (int i = 0; i < 8; i++) {
     t->priorities[i] = priority;
   }
+  t->nested_prev = NULL;
+  t->nested_next = NULL;
+  list_init(&t->donated_from_list);
+  list_init(&t->donate_to_list);
+
+
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable();
