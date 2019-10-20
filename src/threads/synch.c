@@ -121,7 +121,7 @@ sema_up(struct semaphore *sema) {
   sema->value++;
 
   //+++++++++++++++++++++++++++++++++++++++++++++++
-  if ((newThread != NULL) && ((newThread->priority) > (thread_get_priority()))) {
+  if ((newThread != NULL) && ((newThread->priority) >= (thread_get_priority()))) {
     thread_yield();
   }
   //+++++++++++++++++++++++++++++++++++++++++++++++++
@@ -192,24 +192,31 @@ lock_init(struct lock *lock) {
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
-void upDate_donate_chain1(struct thread *t, int new_priority){
-  if ((t != NULL) && (t->donateTo != NULL))
+
+// Helper function that recursively update the donate chain.
+void upDate_donate_chain1(struct thread *donatedFrom, int new_priority){
+  if ((donatedFrom != NULL) && (donatedFrom->donateTo != NULL))
   {
-    struct thread *donater = list_entry((t->donateTo), struct thread, elem);
+    // donater is the thread, that current_thread() donate to;
+    // which means current_thread() has donated to donater;
+    struct thread *getDonate = list_entry((donatedFrom->donateTo), struct thread, elem);
 
-    if (t->priority == donater->priority) {
-      upDate_donate_chain1(donater, new_priority);
-      donater->priority = new_priority;
+    // Update the priority in 'getDonate' priorities array;
+    if (donatedFrom->priority == getDonate->priority) {
+      upDate_donate_chain1(getDonate, new_priority);
+      getDonate->priority = new_priority;
     }
-
-
     for (int i = 0; i < 8; i++) {
-      if (donater->priorities[i] == t->priority) {
-        donater->priorities[i] = new_priority;
+      if (getDonate->priorities[i] == donatedFrom->priority) {
+        getDonate->priorities[i] = new_priority;
       }
     }
 
   }
+}
+
+void help(struct lock *lock){
+
 }
 
 void
@@ -249,6 +256,15 @@ lock_acquire(struct lock *lock) {
 
   sema_down(&lock->semaphore);
 
+  if (!list_empty(&lock->semaphore.waiters)){
+    int thisPrior =
+        list_entry(list_max(&lock->semaphore.waiters, compare_priority, NULL), struct thread, elem)->priority;
+    thread_current()->priorities[thread_current()->currentPos] = thisPrior;
+    thread_current()->currentPos++;
+    if (thread_get_priority() <= thisPrior) {
+      thread_current()->priority = thisPrior;
+    }
+  }
 
   lock->holder = thread_current();
 
@@ -287,29 +303,34 @@ lock_release(struct lock *lock) {
   int thisPrior =
       list_entry(list_max(&lock->semaphore.waiters, compare_priority, NULL), struct thread, elem)->priority;
 
+  //Set the priorities that lock->holder get donated to 0, because the lock is going to release.
   for (int i = 0; i < 8; i++) {
     if (lock->holder->priorities[i] == thisPrior) {
       lock->holder->priorities[i] = 0;
       break;
     }
   }
+  //------------------------------------------------------------------------
 
   int newPrior;
   newPrior = 0;
 
+  //Find next effective priority from the donation array, it should be the highest.
   for (int i = 0; i < 8; i++) {
-    if (lock->holder->priorities[i] > newPrior) {
+    if (lock->holder->priorities[i] >= newPrior) {
       newPrior = lock->holder->priorities[i];
     }
   }
+  //-----------------------------------------------
 
 
   lock->holder = NULL;
 
   sema_up(&lock->semaphore);
 
+  // If current thread isn't the highest priority, yield.
   thread_current()->priority = newPrior;
-  if ((newPrior < list_entry (list_max(get_ready_list(), compare_priority, NULL), struct thread, elem)->priority)
+  if ((newPrior <= list_entry (list_max(get_ready_list(), compare_priority, NULL), struct thread, elem)->priority)
       && (!list_empty(get_ready_list()))){
     thread_yield();
   }
