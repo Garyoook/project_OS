@@ -108,6 +108,7 @@ thread_init(void) {
   init_thread(initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid();
+  initial_thread->nice = 0; // JOJO: B.1 niceness
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -420,14 +421,13 @@ thread_get_priority(void) {
 /* Sets the current thread's nice value to NICE. */
 void
 thread_set_nice(int nice UNUSED) {
-  /* Not yet implemented. */
+    thread_current()->nice = nice; // JOJO: B.1 Niceness
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice(void) {
-  /* Not yet implemented. */
-  return 0;
+    return thread_current()->nice; // JOJO: B.1 Niceness
 }
 
 /* Returns 100 times the system load average. */
@@ -523,7 +523,12 @@ init_thread(struct thread *t, const char *name, int priority) {
   t->status = THREAD_BLOCKED;
   strlcpy(t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
-  t->priority = priority;
+  // JOJO: 3.3.5 if enabled mlfqs then the priority is default 31
+  if (!thread_mlfqs) {
+      t->priority = priority;
+  } else {
+      t->priority = PRI_DEFAULT;
+  }
 //  to initialise added field "priorities";
   for (int i = 0; i < 8; i++) {
     t->priorities[i] = priority;
