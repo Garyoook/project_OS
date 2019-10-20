@@ -11,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/fixed-point.h"
 
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -58,6 +59,8 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
+
+int load_avg = 0;               // JOJO: B.4
 
 static void kernel_thread(thread_func *, void *aux);
 
@@ -152,6 +155,17 @@ thread_tick(void) {
 #endif
   else
     kernel_ticks++;
+
+  /* JOJO: B priority recalculation and load_avg calculation */
+  if (thread_mlfqs) {
+    // TODO: ticks%4==0 -> priorityOfThread = PRI_MAX - recentcpu/4 - nice*2
+    if (kernel_ticks%100==0) {
+      fp load_avg_weight = DIVIDE(N_TO_FIXED_POINT(59), N_TO_FIXED_POINT(60));
+      fp ready_list_weight = DIVIDE(N_TO_FIXED_POINT(1), N_TO_FIXED_POINT(60));
+      load_avg = X_TO_INTEGER(load_avg_weight)*load_avg
+              + X_TO_INTEGER(ready_list_weight)*ready_list.
+    }
+  }
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
@@ -433,8 +447,7 @@ thread_get_nice(void) {
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg(void) {
-  /* Not yet implemented. */
-  return 0;
+  return load_avg;                 // JOJO: B.4
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
