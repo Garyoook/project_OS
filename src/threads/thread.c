@@ -163,7 +163,7 @@ thread_tick(void) {
       fp load_avg_weight = DIVIDE(N_TO_FIXED_POINT(59), N_TO_FIXED_POINT(60));
       fp ready_list_weight = DIVIDE(N_TO_FIXED_POINT(1), N_TO_FIXED_POINT(60));
       load_avg = X_TO_INTEGER(load_avg_weight)*load_avg
-              + X_TO_INTEGER(ready_list_weight)*ready_list.
+              + X_TO_INTEGER(ready_list_weight)*list_size(&ready_list);
     }
   }
 
