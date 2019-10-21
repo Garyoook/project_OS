@@ -11,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/fixed-point.h"
 
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -37,6 +38,8 @@ static struct thread *initial_thread;
 
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
+
+int load_avg;
 
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame {
@@ -152,6 +155,8 @@ thread_tick(void) {
   else
     kernel_ticks++;
 
+
+
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return();
@@ -228,6 +233,7 @@ thread_create(const char *name, int priority,
   if (t->priority > thread_get_priority()) {
     thread_yield();
   }
+
 
   return tid;
 }
@@ -394,7 +400,8 @@ set_thread_blocked_ticks(struct thread *t, int64_t ticks) {
 void
 thread_set_priority(int new_priority) {
   thread_current()->priority = new_priority;
-  if (new_priority < list_entry (list_max(&ready_list, compare_priority, NULL), struct thread, elem)->priority) {
+  if (new_priority < list_entry (list_max(&ready_list, compare_priority, NULL),
+      struct thread, elem)->priority) {
     thread_yield();
   }
 
@@ -422,12 +429,12 @@ thread_get_priority(void) {
 //  }
   if (!list_empty(&cur->donated_from_list)) {
     int new_pri = list_entry(list_pop_front(&cur->donated_from_list), struct thread, elem)->priority;
-    if (new_pri > max) {
+    if (new_pri >= max) {
       max = new_pri;
     }
   }
 
-  if (cur->priority > max) {
+  if (cur->priority >= max) {
     max = cur->priority;
   }
 
@@ -437,29 +444,45 @@ thread_get_priority(void) {
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice(int nice UNUSED) {
-  /* Not yet implemented. */
+thread_set_nice(int new_nice) {
+  struct thread *cur = thread_current();
+  cur->nice = new_nice;
+
+  // recalculate the priority: ------------------------------------------------
+  int new_pri = PRI_MAX - (thread_get_recent_cpu() / 4) - thread_get_nice()*2;
+  if (new_pri < PRI_MIN) {
+    new_pri = PRI_MIN;
+  }
+  thread_current()->priority = new_pri;
+  /*--------------------------------------------------------------------------*/
+
+  // see if the current thread has the highest priority, if not, yield;
+  if (cur->priority < list_entry(list_max(&ready_list, compare_priority, NULL),struct thread, elem)->priority) {
+    thread_yield();
+  }
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice(void) {
-  /* Not yet implemented. */
-  return 0;
+  return thread_current()->nice;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg(void) {
-  /* Not yet implemented. */
-  return 0;
+  int avg = load_avg;
+  avg = (59/60)*avg + (1/60)*(int)(list_size(&ready_list)/sizeof(struct thread));
+  return 100*avg;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu(void) {
-  /* Not yet implemented. */
-  return 0;
+  int cpu = thread_current()->recent_cpu;
+  int avg = thread_get_load_avg();
+  thread_current()->recent_cpu = fp_divide(fp_multi_x_n(avg, 2), (fp_add_x_and_n(fp_multi_x_n(avg, 2), 2)))
+  return 100*thread_current()->recent_cpu;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -541,18 +564,37 @@ init_thread(struct thread *t, const char *name, int priority) {
   t->status = THREAD_BLOCKED;
   strlcpy(t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
-  t->priority = priority;
+  if (thread_mlfqs) {
+    t->priority = PRI_DEFAULT;
+  } else {
+    t->priority = priority;
+  }
 //  to initialise added field "priorities";
   t->nested_level = 0;
   t->base_priority = priority;
   for (int i = 0; i < 8; i++) {
     t->priorities[i] = priority;
   }
+
   t->nested_prev = NULL;
   t->nested_next = NULL;
   list_init(&t->donated_from_list);
   list_init(&t->donate_to_list);
+  t->nice = 0;
+  load_avg = 0;
+  if (list_empty(&all_list)) {
+    t->recent_cpu = 0;
+  } else {
+    t->recent_cpu = thread_current()->recent_cpu;
+  }
 
+
+//  /*[Gary]: add to use BSD*/
+//  if (thread_current() != NULL) {
+//    t->recent_cpu = thread_current()->recent_cpu;
+//  } else {
+//    t->recent_cpu = 0;
+//  }
 
   t->magic = THREAD_MAGIC;
 

@@ -318,4 +318,4 @@ add_executable(pintos_47
         src/userprog/tss.h
         src/utils/setitimer-helper.c
         src/utils/squish-pty.c
-        src/utils/squish-unix.c)
+        src/utils/squish-unix.c src/threads/fixed-point.h)

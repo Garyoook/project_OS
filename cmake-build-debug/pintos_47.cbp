@@ -901,6 +901,9 @@
 		<Unit filename="/homes/yg9418/Downloads/Pintos/pintos_47/src/tests/vm/qsort.h">
 			<Option target="pintos_47"/>
 		</Unit>
+		<Unit filename="/homes/yg9418/Downloads/Pintos/pintos_47/src/threads/fixed-point.h">
+			<Option target="pintos_47"/>
+		</Unit>
 		<Unit filename="/homes/yg9418/Downloads/Pintos/pintos_47/src/threads/flags.h">
 			<Option target="pintos_47"/>
 		</Unit>
