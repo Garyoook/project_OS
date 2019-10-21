@@ -225,7 +225,7 @@ thread_create(const char *name, int priority,
   /* Add to run queue. */
   thread_unblock(t);
 
-  if (t->priority > thread_get_priority()) {
+  if (t->priority >= thread_get_priority()) {
     thread_yield();
   }
 
@@ -612,7 +612,7 @@ next_thread_to_run(void) {
 bool compare_priority(const struct list_elem *e1, const struct list_elem *e2, void *aux UNUSED) {
   struct thread *t1 = list_entry(e1, struct thread, elem);
   struct thread *t2 = list_entry(e2, struct thread, elem);
-  return t1->priority <= t2->priority;
+  return t1->priority < t2->priority;
 }
 //
 

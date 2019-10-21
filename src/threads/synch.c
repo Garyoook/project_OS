@@ -202,7 +202,7 @@ void upDate_donate_chain1(struct thread *donatedFrom, int new_priority){
     struct thread *getDonate = list_entry((donatedFrom->donateTo), struct thread, elem);
 
     // Update the priority in 'getDonate' priorities array;
-    if (donatedFrom->priority == getDonate->priority) {
+    if ((donatedFrom->priority == getDonate->priority) && (donatedFrom->priority != NULL) && (getDonate->priority)) {
       upDate_donate_chain1(getDonate, new_priority);
       getDonate->priority = new_priority;
     }
@@ -407,6 +407,18 @@ cond_wait(struct condition *cond, struct lock *lock) {
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to signal a condition variable within an
    interrupt handler. */
+
+
+bool compare_priority_sema(const struct list_elem *e1, const struct list_elem *e2, void *aux UNUSED) {
+  struct semaphore_elem *t1 = list_entry(e1, struct semaphore_elem, elem);
+  struct semaphore_elem *t2 = list_entry(e2, struct semaphore_elem, elem);
+  int p1 = list_entry(list_max(&t1->semaphore.waiters, compare_priority, NULL), struct thread, elem)->priority;
+  int p2 = list_entry(list_max(&t2->semaphore.waiters, compare_priority, NULL), struct thread, elem)->priority;
+  return p1 < p2;
+
+}
+
+
 void
 cond_signal(struct condition *cond, struct lock *lock UNUSED) {
   ASSERT (cond != NULL);
@@ -414,9 +426,13 @@ cond_signal(struct condition *cond, struct lock *lock UNUSED) {
   ASSERT (!intr_context());
   ASSERT (lock_held_by_current_thread(lock));
 
-  if (!list_empty(&cond->waiters))
-    sema_up(&list_entry (list_pop_front(&cond->waiters),
-                         struct semaphore_elem, elem)->semaphore);
+  if (!list_empty(&cond->waiters)){
+
+    struct list_elem *next_sema = list_max(&cond->waiters, compare_priority_sema, NULL);
+
+    list_remove(next_sema);
+    sema_up(&list_entry (next_sema, struct semaphore_elem, elem)->semaphore);
+  }
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by
