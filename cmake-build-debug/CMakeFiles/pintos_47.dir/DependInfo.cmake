@@ -211,6 +211,7 @@ set(CMAKE_DEPENDS_CHECK_C
   "/homes/yg9418/Downloads/Pintos/pintos_47/src/tests/vm/pt-write-code-2.c" "/homes/yg9418/Downloads/Pintos/pintos_47/cmake-build-debug/CMakeFiles/pintos_47.dir/src/tests/vm/pt-write-code-2.c.o"
   "/homes/yg9418/Downloads/Pintos/pintos_47/src/tests/vm/pt-write-code.c" "/homes/yg9418/Downloads/Pintos/pintos_47/cmake-build-debug/CMakeFiles/pintos_47.dir/src/tests/vm/pt-write-code.c.o"
   "/homes/yg9418/Downloads/Pintos/pintos_47/src/tests/vm/qsort.c" "/homes/yg9418/Downloads/Pintos/pintos_47/cmake-build-debug/CMakeFiles/pintos_47.dir/src/tests/vm/qsort.c.o"
+  "/homes/yg9418/Downloads/Pintos/pintos_47/src/threads/fixed-point-test.c" "/homes/yg9418/Downloads/Pintos/pintos_47/cmake-build-debug/CMakeFiles/pintos_47.dir/src/threads/fixed-point-test.c.o"
   "/homes/yg9418/Downloads/Pintos/pintos_47/src/threads/init.c" "/homes/yg9418/Downloads/Pintos/pintos_47/cmake-build-debug/CMakeFiles/pintos_47.dir/src/threads/init.c.o"
   "/homes/yg9418/Downloads/Pintos/pintos_47/src/threads/interrupt.c" "/homes/yg9418/Downloads/Pintos/pintos_47/cmake-build-debug/CMakeFiles/pintos_47.dir/src/threads/interrupt.c.o"
   "/homes/yg9418/Downloads/Pintos/pintos_47/src/threads/malloc.c" "/homes/yg9418/Downloads/Pintos/pintos_47/cmake-build-debug/CMakeFiles/pintos_47.dir/src/threads/malloc.c.o"

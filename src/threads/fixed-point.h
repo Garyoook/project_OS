@@ -9,7 +9,7 @@
 
 #endif //PINTOS_47_FIXED_POINT_H
 
-typedef int32_t fp;
+typedef int64_t fp;
 
 #define f (1 << 14)
 
@@ -18,10 +18,10 @@ typedef int32_t fp;
 #define fp_x_to_integer_round_to_nearest(x) ((x)>=0 ? ((x) + f/2)/f : ((x) - f/2)/f)
 #define fp_add(x, y) ((x) + (y))
 #define fp_sub(x, y) ((x) - (y))
-#define fp_add_x_and_n(x, n) ((x) + (n)*f)
+#define fp_add_fp_and_int(x, n) ((x) + (n)*f)
 #define fp_sub_n_from_x(x, n) ((x) - (n)*f)
 #define fp_multi(x, y) ((fp)(((int64_t) (x))*(y)/f))
-#define fp_multi_x_n(x, n) ((x)*(n))
+#define fp_multi_fp_int(x, n) ((x)*(n))
 #define fp_divide(x, y) ((fp)(((int64_t) (x))*f/(y)))
 #define fp_divide_x_by_n(x, n) ((x)/(n))
 

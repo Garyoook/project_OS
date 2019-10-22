@@ -140,10 +140,34 @@ threads_ready(void) {
 //[Gary]: update the load_avg and recent_cpu in this function
 void update_BSD() {
   fp avg = load_avg;
-  thread_current()->recent_cpu = fp_divide(fp_multi_x_n(avg, 2), (fp_add_x_and_n(fp_multi_x_n(avg, 2), 2)));
+  fp cpu = thread_current()->recent_cpu;
+  thread_current()->recent_cpu = fp_add_fp_and_int(fp_multi(fp_divide(fp_multi_fp_int(avg, 2),
+      (fp_add_fp_and_int(fp_multi_fp_int(avg, 2), 1))), cpu), thread_current()->nice);
 
-  load_avg = fp_add(fp_multi(fp_frac(59, 60), avg), fp_multi_x_n((fp_frac(1, 60)),
+  load_avg = fp_add(fp_multi(fp_frac(59, 60), avg), fp_multi_fp_int((fp_frac(1, 60)),
       (int) (threads_ready() + (thread_current() != idle_thread ? 1 : 0))));
+
+  struct list_elem *e;
+
+  for (e = list_begin (&ready_list); e != list_end (&ready_list);
+       e = list_next (e))
+  {
+    struct thread *thr = list_entry (e, struct thread, elem);
+
+    int new_pri = PRI_MAX - fp_divide_x_by_n(thread_current()->recent_cpu, 4) - thread_get_nice() * 2;
+    if (new_pri < PRI_MIN) {
+      new_pri = PRI_MIN;
+    }
+    thr->priority = new_pri;
+    /*--------------------------------------------------------------------------*/
+
+    // see if the current thread has the highest priority, if not, yield;
+    if (thr->priority < list_entry(list_max(&ready_list, compare_priority, NULL), struct thread, elem)->priority) {
+      thread_yield();
+    }
+  }
+
+
 }
 
 /* Called by the timer interrupt handler at each timer tick.
@@ -166,14 +190,28 @@ thread_tick(void) {
   else
     kernel_ticks++;
 
-//
+//++++++++++++++++++++++++++++++++++++++++++++++++++
   if (thread_mlfqs) {
     if (kernel_ticks % TIMER_FREQ == 0) {
       update_BSD();
     }
 
     if (kernel_ticks % TIME_SLICE == 0) {
-      fp_add_x_and_n(thread_current()->recent_cpu, 1);
+      fp_add_fp_and_int(thread_current()->recent_cpu, 1);
+
+      // recalculate the priority: ------------------------------------------------
+      struct list_elem *e;
+
+      for (e = list_begin (&ready_list); e != list_end (&ready_list);
+           e = list_next (e)) {
+        struct thread *thr = list_entry (e, struct thread, elem);
+
+        int new_pri = PRI_MAX - fp_divide_x_by_n(thread_current()->recent_cpu, 4) - thread_get_nice() * 2;
+        if (new_pri < PRI_MIN) {
+          new_pri = PRI_MIN;
+        }
+        thr->priority = new_pri;
+      }
     }
   }
 
