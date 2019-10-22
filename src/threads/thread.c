@@ -339,9 +339,23 @@ thread_exit(void) {
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
+
   intr_disable();
+
+  struct list_elem *e;
+
+  for (e = list_begin (&all_list); e != list_end (&all_list);
+       e = list_next (e))
+  {
+    struct thread *f = list_entry (e, struct thread, allelem);
+    if (f->donateTo == thread_current()){
+      f->donateTo = NULL;
+    }
+  }
+  thread_current()->donateTo = NULL;
   list_remove(&thread_current()->allelem);
   thread_current()->status = THREAD_DYING;
+
   schedule();
   NOT_REACHED ();
 }
@@ -394,13 +408,13 @@ set_thread_blocked_ticks(struct thread *t, int64_t ticks) {
 void upDate_donate_chain(struct thread *t, int new_priority){
   if ((t != NULL) && (t->donateTo != NULL))
   {
-    struct thread *donater = list_entry((t->donateTo), struct thread, elem);
+    struct thread *donater = (t->donateTo);
 
     if (t->priority == donater->priority) {
       upDate_donate_chain(donater, new_priority);
       donater->priority = new_priority;
     } else {
-      for (int i = 0; i < 8; i++) {
+      for (int i = 1; i < 8; i++) {
         if (donater->priorities[i] == t->priority) {
           donater->priorities[i] = new_priority;
         }

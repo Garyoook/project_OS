@@ -195,29 +195,26 @@ lock_init(struct lock *lock) {
 
 // Helper function that recursively update the donate chain.
 void upDate_donate_chain1(struct thread *donatedFrom, int new_priority){
-  if ((donatedFrom != NULL) && (donatedFrom->donateTo != NULL))
+  if ((donatedFrom != NULL) && (donatedFrom->status != THREAD_DYING) && (donatedFrom->donateTo != NULL) && donatedFrom->donateTo->status != THREAD_DYING)
   {
     // donater is the thread, that current_thread() donate to;
     // which means current_thread() has donated to donater;
-    struct thread *getDonate = list_entry((donatedFrom->donateTo), struct thread, elem);
-
-    // Update the priority in 'getDonate' priorities array;
-    if ((donatedFrom->priority == getDonate->priority) && (donatedFrom->priority != NULL) && (getDonate->priority)) {
+    struct thread *getDonate = donatedFrom->donateTo;
+    int p = donatedFrom->priority;
+    if (p == getDonate->priority) {
       upDate_donate_chain1(getDonate, new_priority);
       getDonate->priority = new_priority;
     }
-    for (int i = 0; i < 8; i++) {
+    for (int i = 1; i < 8; i++) {
       if (getDonate->priorities[i] == donatedFrom->priority) {
         getDonate->priorities[i] = new_priority;
+        break;
       }
     }
 
   }
 }
 
-void help(struct lock *lock){
-
-}
 
 void
 lock_acquire(struct lock *lock) {
@@ -227,14 +224,15 @@ lock_acquire(struct lock *lock) {
 
   if (lock->holder != NULL) {
 
-    upDate_donate_chain1(lock->holder, thread_get_priority());
+    if (lock->holder->status != THREAD_DYING)
+      upDate_donate_chain1(lock->holder, thread_get_priority());
 
     if (!list_empty(&lock->semaphore.waiters)){
       int thisPrior =
           list_entry(list_max(&lock->semaphore.waiters, compare_priority, NULL), struct thread, elem)->priority;
 
       if (thread_get_priority() > thisPrior) {
-        for (int i = 0; i < 8; i++) {
+        for (int i = 1; i < 8; i++) {
           if (lock->holder->priorities[i] == thisPrior) {
             lock->holder->priorities[i] = thread_get_priority();
             break;
@@ -251,7 +249,7 @@ lock_acquire(struct lock *lock) {
       lock->holder->priority = thread_get_priority();
     }
 
-    thread_current()->donateTo = &lock->holder->elem;
+    thread_current()->donateTo = lock->holder;
   }
 
   sema_down(&lock->semaphore);
@@ -298,13 +296,22 @@ lock_try_acquire(struct lock *lock) {
    handler. */
 void
 lock_release(struct lock *lock) {
+/*
+  struct list_elem *e;
 
+  for (e = list_begin (&lock->semaphore.waiters); e != list_end (&lock->semaphore.waiters);
+       e = list_next (e))
+  {
+    struct thread *f = list_entry (e, struct thread, elem);
+    f->donateTo = NULL;
+  }
+*/
 
   int thisPrior =
       list_entry(list_max(&lock->semaphore.waiters, compare_priority, NULL), struct thread, elem)->priority;
 
   //Set the priorities that lock->holder get donated to 0, because the lock is going to release.
-  for (int i = 0; i < 8; i++) {
+  for (int i = 1; i < 8; i++) {
     if (lock->holder->priorities[i] == thisPrior) {
       lock->holder->priorities[i] = 0;
       break;
@@ -321,10 +328,14 @@ lock_release(struct lock *lock) {
       newPrior = lock->holder->priorities[i];
     }
   }
+
+
   //-----------------------------------------------
 
 
   lock->holder = NULL;
+
+
 
   sema_up(&lock->semaphore);
 

@@ -95,8 +95,8 @@ struct thread
     int64_t blocked_ticks;              /* If the thread is blocked, it will be unblock after blocked ticks. */       
     struct list_elem allelem;           /* List element for all threads list. */
 
-    int priorities[8];
-    struct list_elem *donateTo;
+    int priorities[20];
+    struct thread *donateTo;
     int currentPos;
 
 
