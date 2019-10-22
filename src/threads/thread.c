@@ -289,7 +289,7 @@ thread_create(const char *name, int priority,
   /* Add to run queue. */
   thread_unblock(t);
 
-  if (t->priority > thread_get_priority()) {
+  if (t->priority >= thread_get_priority()) {
     thread_yield();
   }
 
@@ -404,9 +404,23 @@ thread_exit(void) {
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
+
   intr_disable();
+
+  struct list_elem *e;
+
+  for (e = list_begin (&all_list); e != list_end (&all_list);
+       e = list_next (e))
+  {
+    struct thread *f = list_entry (e, struct thread, allelem);
+    if (f->donateTo == thread_current()){
+      f->donateTo = NULL;
+    }
+  }
+  thread_current()->donateTo = NULL;
   list_remove(&thread_current()->allelem);
   thread_current()->status = THREAD_DYING;
+
   schedule();
   NOT_REACHED ();
 }
@@ -456,11 +470,44 @@ set_thread_blocked_ticks(struct thread *t, int64_t ticks) {
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
+void upDate_donate_chain(struct thread *t, int new_priority){
+  if ((t != NULL) && (t->donateTo != NULL))
+  {
+    struct thread *donater = (t->donateTo);
+
+    if (t->priority == donater->priority) {
+      upDate_donate_chain(donater, new_priority);
+      donater->priority = new_priority;
+    } else {
+      for (int i = 1; i < 8; i++) {
+        if (donater->priorities[i] == t->priority) {
+          donater->priorities[i] = new_priority;
+        }
+      }
+    }
+  }
+}
+
+struct list *get_ready_list(){
+  return &ready_list;
+}
+
 void
 thread_set_priority(int new_priority) {
-  thread_current()->priority = new_priority;
-  if (new_priority < list_entry (list_max(&ready_list, compare_priority, NULL),
-                                 struct thread, elem)->priority) {
+  upDate_donate_chain(thread_current(), new_priority);
+  thread_current()->priorities[0] = new_priority;
+
+  int newPrior = 0;
+  for (int i = 0; i < 8; i++){
+    if (thread_current()->priorities[i] > newPrior){
+      newPrior = thread_current()->priorities[i];
+    }
+  }
+
+  thread_current()->priority = newPrior;
+
+  if ((newPrior < list_entry (list_max(&ready_list, compare_priority, NULL), struct thread, elem)->priority)
+  && (!list_empty(&ready_list))){
     thread_yield();
   }
 
@@ -470,34 +517,17 @@ thread_set_priority(int new_priority) {
 int
 thread_get_priority(void) {
   struct thread *cur = thread_current();
-  int max = 0;
-
-//  for (int i = 0; i < 8; i++) {
-//    if (cur->priorities[i] > max) {
-//      max = cur->priorities[i];
-//    }
-//  }
-//
-//  while (cur->nested_next != NULL) {
-//    struct thread *next_thr = list_entry(cur->nested_next, struct thread, elem);
-//    int next_pri = next_thr->priority;
-//    if (next_pri > max) {
-//      max = next_pri;
-//    }
-//    cur = next_thr;
-//  }
-  if (!list_empty(&cur->donated_from_list)) {
-    int new_pri = list_entry(list_pop_front(&cur->donated_from_list), struct thread, elem)->priority;
-    if (new_pri >= max) {
-      max = new_pri;
+/*  int max = 0;
+  for (int i = 0; i < 8; i++) {
+    if (cur->priorities[i] > max) {
+      max = cur->priorities[i];
     }
   }
-
-  if (cur->priority >= max) {
+  if (cur->priority > max) {
     max = cur->priority;
   }
-
-  return max;
+  */
+  return cur->priority;
 
 }
 
@@ -624,10 +654,8 @@ init_thread(struct thread *t, const char *name, int priority) {
     t->priority = priority;
   }
 //  to initialise added field "priorities";
-  t->nested_level = 0;
-  t->base_priority = priority;
-  for (int i = 0; i < 8; i++) {
-    t->priorities[i] = priority;
+  for (int i = 1; i < 8; i++) {
+    t->priorities[i] = 0;
   }
 
   t->nested_prev = NULL;
@@ -651,6 +679,10 @@ init_thread(struct thread *t, const char *name, int priority) {
 //  }
 
   t->magic = THREAD_MAGIC;
+  t->currentPos = 1;
+
+  t->donateTo = NULL;
+  t->priorities[0] = t->priority;
 
   old_level = intr_disable();
   list_push_back(&all_list, &t->allelem);
@@ -694,7 +726,7 @@ next_thread_to_run(void) {
 bool compare_priority(const struct list_elem *e1, const struct list_elem *e2, void *aux UNUSED) {
   struct thread *t1 = list_entry(e1, struct thread, elem);
   struct thread *t2 = list_entry(e2, struct thread, elem);
-  return t1->priority <= t2->priority;
+  return t1->priority < t2->priority;
 }
 //
 

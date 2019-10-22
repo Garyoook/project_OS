@@ -94,17 +94,20 @@ struct thread
     int64_t blocked_ticks;              /* If the thread is blocked, it will be unblock after blocked ticks. */       
     struct list_elem allelem;           /* List element for all threads list. */
 
-//    self defied:
-    int base_priority;         /* Another representation of priority to cooperate with donations.*/
-    int priorities[8];
-    int nested_level;
-    struct list_elem *nested_next;
-    struct list_elem *nested_prev;
-    struct list donate_to_list;
-    struct list donated_from_list;
-    // for BSD:
-    int nice;
-    int recent_cpu;
+    int priorities[20];
+    struct thread *donateTo;
+    int currentPos;
+
+  //    self defied:
+  int base_priority;         /* Another representation of priority to cooperate with donations.*/
+  int nested_level;
+  struct list_elem *nested_next;
+  struct list_elem *nested_prev;
+  struct list donate_to_list;
+  struct list donated_from_list;
+  // for BSD:
+  int nice;
+  int recent_cpu;
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -161,5 +164,6 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 bool compare_priority(const struct list_elem *e1, const struct list_elem *e2, void *aux);
+struct list *get_ready_list();
 
 #endif /* threads/thread.h */
