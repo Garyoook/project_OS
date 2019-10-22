@@ -12,6 +12,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "threads/fixed-point.h"
+#include "devices/timer.h"
 
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -39,7 +40,8 @@ static struct thread *initial_thread;
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
 
-int load_avg;
+//[Gary]: global var for BSD
+static fp load_avg;
 
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame {
@@ -135,6 +137,15 @@ threads_ready(void) {
   return list_size(&ready_list);
 }
 
+//[Gary]: update the load_avg and recent_cpu in this function
+void update_BSD() {
+  fp avg = load_avg;
+  thread_current()->recent_cpu = fp_divide(fp_multi_x_n(avg, 2), (fp_add_x_and_n(fp_multi_x_n(avg, 2), 2)));
+
+  load_avg = fp_add(fp_multi(fp_frac(59, 60), avg), fp_multi_x_n((fp_frac(1, 60)),
+      (int)(threads_ready() + (thread_current() != idle_thread ? 1 : 0))));
+}
+
 /* Called by the timer interrupt handler at each timer tick.
  *
  *
@@ -155,6 +166,14 @@ thread_tick(void) {
   else
     kernel_ticks++;
 
+//
+  if (kernel_ticks % TIMER_FREQ == 0) {
+    update_BSD();
+  }
+
+  if (kernel_ticks % TIME_SLICE == 0) {
+    fp_add_x_and_n(thread_current()->recent_cpu, 1);
+  }
 
 
   /* Enforce preemption. */
@@ -449,7 +468,7 @@ thread_set_nice(int new_nice) {
   cur->nice = new_nice;
 
   // recalculate the priority: ------------------------------------------------
-  int new_pri = PRI_MAX - (thread_get_recent_cpu() / 4) - thread_get_nice()*2;
+  int new_pri = PRI_MAX - fp_divide_x_by_n(thread_current()->recent_cpu, 4) - thread_get_nice()*2;
   if (new_pri < PRI_MIN) {
     new_pri = PRI_MIN;
   }
@@ -471,17 +490,12 @@ thread_get_nice(void) {
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg(void) {
-  int avg = load_avg;
-  avg = (59/60)*avg + (1/60)*(int)(list_size(&ready_list)/sizeof(struct thread));
-  return 100*avg;
+  return 100*load_avg;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu(void) {
-  int cpu = thread_current()->recent_cpu;
-  int avg = thread_get_load_avg();
-  thread_current()->recent_cpu = fp_divide(fp_multi_x_n(avg, 2), (fp_add_x_and_n(fp_multi_x_n(avg, 2), 2)))
   return 100*thread_current()->recent_cpu;
 }
 
