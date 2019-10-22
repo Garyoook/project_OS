@@ -143,7 +143,7 @@ void update_BSD() {
   thread_current()->recent_cpu = fp_divide(fp_multi_x_n(avg, 2), (fp_add_x_and_n(fp_multi_x_n(avg, 2), 2)));
 
   load_avg = fp_add(fp_multi(fp_frac(59, 60), avg), fp_multi_x_n((fp_frac(1, 60)),
-      (int)(threads_ready() + (thread_current() != idle_thread ? 1 : 0))));
+      (int) (threads_ready() + (thread_current() != idle_thread ? 1 : 0))));
 }
 
 /* Called by the timer interrupt handler at each timer tick.
@@ -167,12 +167,14 @@ thread_tick(void) {
     kernel_ticks++;
 
 //
-  if (kernel_ticks % TIMER_FREQ == 0) {
-    update_BSD();
-  }
+  if (thread_mlfqs) {
+    if (kernel_ticks % TIMER_FREQ == 0) {
+      update_BSD();
+    }
 
-  if (kernel_ticks % TIME_SLICE == 0) {
-    fp_add_x_and_n(thread_current()->recent_cpu, 1);
+    if (kernel_ticks % TIME_SLICE == 0) {
+      fp_add_x_and_n(thread_current()->recent_cpu, 1);
+    }
   }
 
 
@@ -420,7 +422,7 @@ void
 thread_set_priority(int new_priority) {
   thread_current()->priority = new_priority;
   if (new_priority < list_entry (list_max(&ready_list, compare_priority, NULL),
-      struct thread, elem)->priority) {
+                                 struct thread, elem)->priority) {
     thread_yield();
   }
 
@@ -468,7 +470,7 @@ thread_set_nice(int new_nice) {
   cur->nice = new_nice;
 
   // recalculate the priority: ------------------------------------------------
-  int new_pri = PRI_MAX - fp_divide_x_by_n(thread_current()->recent_cpu, 4) - thread_get_nice()*2;
+  int new_pri = PRI_MAX - fp_divide_x_by_n(thread_current()->recent_cpu, 4) - thread_get_nice() * 2;
   if (new_pri < PRI_MIN) {
     new_pri = PRI_MIN;
   }
@@ -476,7 +478,7 @@ thread_set_nice(int new_nice) {
   /*--------------------------------------------------------------------------*/
 
   // see if the current thread has the highest priority, if not, yield;
-  if (cur->priority < list_entry(list_max(&ready_list, compare_priority, NULL),struct thread, elem)->priority) {
+  if (cur->priority < list_entry(list_max(&ready_list, compare_priority, NULL), struct thread, elem)->priority) {
     thread_yield();
   }
 }
@@ -490,13 +492,13 @@ thread_get_nice(void) {
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg(void) {
-  return 100*load_avg;
+  return 100 * (load_avg/f);
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu(void) {
-  return 100*thread_current()->recent_cpu;
+  return 100 * (thread_current()->recent_cpu/f);
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
