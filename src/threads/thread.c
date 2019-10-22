@@ -22,7 +22,7 @@
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
-
+bool compare_thread_priority(const struct list_elem *e1, const struct list_elem *e2, void *U);
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
@@ -332,8 +332,12 @@ thread_unblock(struct thread *t) {
   ASSERT (t->status == THREAD_BLOCKED);
   list_push_back(&ready_list, &t->elem);
   t->status = THREAD_READY;
-  intr_set_level(old_level);
 
+  if (t->priority > thread_current()->priority){
+    thread_yield();
+  }
+
+  intr_set_level (old_level);
 }
 
 //
@@ -457,10 +461,12 @@ set_thread_blocked_ticks(struct thread *t, int64_t ticks) {
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
-thread_set_priority(int new_priority) {
-  thread_current()->priority = new_priority;
-  if (new_priority < list_entry (list_max(&ready_list, compare_priority, NULL),
-                                 struct thread, elem)->priority) {
+thread_set_priority (int new_priority) 
+{
+  thread_current ()->priority = new_priority;
+  int highest_priority_in_readylist =
+      list_entry(list_max(&ready_list, compare_thread_priority, NULL), struct thread, elem)->priority;
+  if (new_priority < highest_priority_in_readylist){
     thread_yield();
   }
 
@@ -468,38 +474,44 @@ thread_set_priority(int new_priority) {
 
 /* Returns the current thread's priority. */
 int
-thread_get_priority(void) {
-  struct thread *cur = thread_current();
-  int max = 0;
+thread_get_priority (void) 
+{
+  return thread_current ()->priority;
+}
 
-//  for (int i = 0; i < 8; i++) {
-//    if (cur->priorities[i] > max) {
-//      max = cur->priorities[i];
+//int
+//thread_get_priority(void) {
+//  struct thread *cur = thread_current();
+//  int max = 0;
+//
+////  for (int i = 0; i < 8; i++) {
+////    if (cur->priorities[i] > max) {
+////      max = cur->priorities[i];
+////    }
+////  }
+////
+////  while (cur->nested_next != NULL) {
+////    struct thread *next_thr = list_entry(cur->nested_next, struct thread, elem);
+////    int next_pri = next_thr->priority;
+////    if (next_pri > max) {
+////      max = next_pri;
+////    }
+////    cur = next_thr;
+////  }
+//  if (!list_empty(&cur->donated_from_list)) {
+//    int new_pri = list_entry(list_pop_front(&cur->donated_from_list), struct thread, elem)->priority;
+//    if (new_pri >= max) {
+//      max = new_pri;
 //    }
 //  }
 //
-//  while (cur->nested_next != NULL) {
-//    struct thread *next_thr = list_entry(cur->nested_next, struct thread, elem);
-//    int next_pri = next_thr->priority;
-//    if (next_pri > max) {
-//      max = next_pri;
-//    }
-//    cur = next_thr;
+//  if (cur->priority >= max) {
+//    max = cur->priority;
 //  }
-  if (!list_empty(&cur->donated_from_list)) {
-    int new_pri = list_entry(list_pop_front(&cur->donated_from_list), struct thread, elem)->priority;
-    if (new_pri >= max) {
-      max = new_pri;
-    }
-  }
-
-  if (cur->priority >= max) {
-    max = cur->priority;
-  }
-
-  return max;
-
-}
+//
+//  return max;
+//
+//}
 
 /* Sets the current thread's nice value to NICE. */
 void
@@ -674,29 +686,30 @@ alloc_frame(struct thread *t, size_t size) {
    empty.  (If the running thread can continue running, then it
    will be in the run queue.)  If the run queue is empty, return
    idle_thread. */
+bool compare_thread_priority1(const struct list_elem *e1, const struct list_elem *e2, void *U)
+{
+  struct thread *t1 = list_entry(e1, struct thread, elem);
+  struct thread *t2 = list_entry(e2, struct thread, elem);
+  return ((t1->priority) > (t2->priority));
+}
+
 static struct thread *
 next_thread_to_run(void) {
   if (list_empty(&ready_list))
     return idle_thread;
-  else {
-//        newly modified in Task1:
-    struct list_elem *e = list_max(&ready_list, compare_priority, NULL);
-    struct thread *t = list_entry (e, struct thread, elem);
-    list_remove(e);
-
-    return t;
+  else
+    return list_entry(list_max(&ready_list, compare_thread_priority1, NULL), struct thread, elem);
+//[Gary]:  else {
+////        newly modified in Task1:
+//    struct list_elem *e = list_max(&ready_list, compare_priority, NULL);
+//    struct thread *t = list_entry (e, struct thread, elem);
+//    list_remove(e);
 //
-  }
-}
+//    return t;
+////
+//  }
 
-
-/* New function: Returns true if priority for t1 is bigger than priority for t2 */
-bool compare_priority(const struct list_elem *e1, const struct list_elem *e2, void *aux UNUSED) {
-  struct thread *t1 = list_entry(e1, struct thread, elem);
-  struct thread *t2 = list_entry(e2, struct thread, elem);
-  return t1->priority <= t2->priority;
 }
-//
 
 /* Completes a thread switch by activating the new thread's page
    tables, and, if the previous thread is dying, destroying it.
