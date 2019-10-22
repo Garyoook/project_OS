@@ -95,7 +95,10 @@ struct thread
     int64_t blocked_ticks;              /* If the thread is blocked, it will be unblock after blocked ticks. */       
     struct list_elem allelem;           /* List element for all threads list. */
 
-    int priorities[8];
+    int priorities[20];
+    struct thread *donateTo;
+    int currentPos;
+
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -152,5 +155,6 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 bool compare_priority(const struct list_elem *e1, const struct list_elem *e2, void *aux);
+struct list *get_ready_list();
 
 #endif /* threads/thread.h */
