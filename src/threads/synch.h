@@ -1,8 +1,8 @@
 #ifndef THREADS_SYNCH_H
 #define THREADS_SYNCH_H
 
-#include <list.h>
-#include <stdbool.h>
+#include<list.h>
+#include<stdbool.h>
 
 /* A counting semaphore. */
 struct semaphore 

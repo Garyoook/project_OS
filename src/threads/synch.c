@@ -215,7 +215,31 @@ void upDate_donate_chain1(struct thread *donatedFrom, int new_priority){
   }
 }
 
-
+//void
+//lock_acquire(struct lock *lock) {
+//  ASSERT (lock != NULL);
+//  ASSERT (!intr_context());
+//  ASSERT (!lock_held_by_current_thread(lock));
+//
+//  if (lock->holder != NULL) {
+//    if (thread_get_priority() > lock->holder->priority) {
+//      struct thread *cur = thread_current();
+//      lock->holder->base_priority = lock->holder->priority;
+//      lock->holder->priority = cur->priority;
+//      if (!list_empty(&cur->donate_to_list) && !list_empty(&lock->holder->donated_from_list)) {
+//        list_insert_ordered(&lock->holder->donated_from_list, &cur->elem, compare_priority, NULL);
+//        list_insert_ordered(&cur->donate_to_list, &lock->holder->elem, compare_priority, NULL);
+//      }
+//
+//
+//
+//////      lock->holder->nested_prev = &thread_current()->elem;
+////      thread_current()->nested_next = &lock->holder->elem;
+////
+////      lock->holder->base_priority = lock->holder->priority;
+////      lock->holder->priority = thread_current()->priority;
+//    }
+//  }
 void
 lock_acquire(struct lock *lock) {
   ASSERT (lock != NULL);
