@@ -40,6 +40,9 @@ static struct thread *initial_thread;
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
 
+static struct lock set_lock;
+
+
 //[Gary]: global var for BSD
 static fp load_avg;
 
@@ -104,6 +107,7 @@ thread_init(void) {
   ASSERT (intr_get_level() == INTR_OFF);
 
   lock_init(&tid_lock);
+  lock_init(&set_lock);
   list_init(&ready_list);
   list_init(&all_list);
   list_init(&blocked_list);
@@ -519,14 +523,19 @@ thread_set_priority(int new_priority) {
   upDate_donate_chain(thread_current(), new_priority);
   thread_current()->priorities[0] = new_priority;
 
+  lock_acquire(&set_lock);
+
   int newPrior = 0;
   for (int i = 0; i < 8; i++){
     if (thread_current()->priorities[i] > newPrior){
       newPrior = thread_current()->priorities[i];
     }
   }
-
   thread_current()->priority = newPrior;
+
+  lock_release(&set_lock);
+
+
   int highestPrior = list_entry(list_max(&ready_list, compare_priority, NULL), struct thread, elem)->priority;
 
   if ((newPrior < highestPrior)
