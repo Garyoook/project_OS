@@ -147,7 +147,10 @@ threads_ready(void) {
 
 
 void update_load_avg() {
-  load_avg = fp_add(fp_divide_x_by_n(fp_multi_fp_int(load_avg, 59), 60), fp_divide_x_by_n(fp_int_to_fp (threads_ready() + (thread_current() != idle_thread ? 1 : 0)), 60));
+  int t1 = fp_multi(59 * F / 60, load_avg);
+  int ready_thread_size = (int) (threads_ready() + (thread_current() != idle_thread ? 1 : 0));
+  int t2 = fp_multi_fp_int(F / 60, ready_thread_size);
+  load_avg = fp_add(t1, t2);
 
 
 //  load_avg = fp_add(fp_multi(fp_frac(59, 60), load_avg), fp_multi_fp_int((fp_frac(1, 60)),
@@ -192,12 +195,15 @@ thread_tick(void) {
 #endif
   else {
     kernel_ticks++;
-    t->recent_cpu = fp_add_fp_and_int(t->recent_cpu, 1);
   }
 //++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 if (thread_mlfqs) {
+
+  if (timer_ticks() % TIMER_FREQ == 0) {
+    update_BSD();
+  }
   if (timer_ticks() % TIME_SLICE == 0) {
 
     t->priority = mlfqs_calculatePriority(t);
@@ -211,9 +217,7 @@ if (thread_mlfqs) {
     }
   }
 
-  if (timer_ticks() % TIMER_FREQ == 0) {
-    update_BSD();
-  }
+
 }
 
 
@@ -345,7 +349,7 @@ thread_unblock(struct thread *t) {
 
   old_level = intr_disable();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back(&ready_list, &t->elem);
+  list_insert_ordered(&ready_list, &t->elem, compare_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level(old_level);
 
@@ -554,7 +558,7 @@ thread_get_priority(void) {
 int mlfqs_calculatePriority(struct thread *t) {
   int new_pri;
   new_pri = fp_x_to_integer_round_to_nearest(fp_sub(fp_int_to_fp(PRI_MAX),
-      fp_sub_n_from_x(fp_divide_x_by_n(t->recent_cpu, 4), (t->nice * 2))));
+      fp_add_fp_and_int(fp_divide_x_by_n(t->recent_cpu, 4), (t->nice * 2))));
 
   if (new_pri > PRI_MAX) {
     new_pri = PRI_MAX;
@@ -573,7 +577,7 @@ thread_set_nice(int new_nice) {
 
   thread_current()->priority = mlfqs_calculatePriority(thread_current());
 
-  if (thread_current() == running_thread() && thread_current()->priority <
+  if (thread_current() == running_thread() && thread_current()->priority <=
       list_entry(list_max(&ready_list,compare_priority, NULL), struct thread, elem)->priority) {
     thread_yield();
   }
@@ -686,14 +690,6 @@ init_thread(struct thread *t, const char *name, int priority) {
   for (int i = 1; i < 8; i++) {
     t->priorities[i] = 0;
   }
-
-  t->nested_prev = NULL;
-  t->nested_next = NULL;
-  list_init(&t->donated_from_list);
-  list_init(&t->donate_to_list);
-
-
-
 
   t->magic = THREAD_MAGIC;
   t->currentPos = 1;
