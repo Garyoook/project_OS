@@ -190,6 +190,10 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   unblock_thread_with_enough_ticks(ticks);
+  struct thread* curr = thread_current();
+  if (curr->status == THREAD_RUNNING) {
+    curr->recent_cpu = fp_add_fp_and_int(curr->recent_cpu, 1);
+  }
   thread_tick ();
 }
 
