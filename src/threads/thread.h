@@ -28,6 +28,7 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -84,6 +85,9 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
+
+#define MAX_LEVEL 8+1  /*Max level of donation*/   
+   
 struct thread
   {
     /* Owned by thread.c. */
@@ -95,17 +99,14 @@ struct thread
     int64_t blocked_ticks;              /* If the thread is blocked, it will be unblock after blocked ticks. */       
     struct list_elem allelem;           /* List element for all threads list. */
 
-    int priorities[20];
-    struct thread *donateTo;
-    int currentPos;
 
-  //    self defied:
-  int base_priority;         /* Another representation of priority to cooperate with donations.*/
-  int nested_level;
-  struct list_elem *nested_next;
-  struct list_elem *nested_prev;
-  struct list donate_to_list;
-  struct list donated_from_list;
+  // self defined:
+  // for priority donation:
+    int priorities[MAX_LEVEL];          /* An array of int to store priorities that this thread get donated*/
+    int currentPos;                     /* current position of array priorities;*/
+    struct thread *donateTo;            /* A pointer to record the thread that this thread donate to*/
+
+
   // for BSD:
   int nice;
   fp recent_cpu;
