@@ -102,9 +102,10 @@ struct thread
 
   // self defined:
   // for priority donation:
-    int priorities[MAX_LEVEL];
-    struct thread *donateTo;
-    int currentPos;
+    int priorities[MAX_LEVEL];          /* An array of int to store priorities that this thread get donated*/
+    int currentPos;                     /* current position of array priorities;*/
+    struct thread *donateTo;            /* A pointer to record the thread that this thread donate to*/
+
 
   // for BSD:
   int nice;
