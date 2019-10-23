@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "fixed-point.h"
 
 /* List of all threads that are blocked. */
 struct list blocked_list;
@@ -107,7 +108,7 @@ struct thread
   struct list donated_from_list;
   // for BSD:
   int nice;
-  int recent_cpu;
+  fp recent_cpu;
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
