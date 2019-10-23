@@ -13,9 +13,10 @@ typedef int32_t fp;
 
 #define F (1 << 14)
 
+#define fp_is_positive(x) (((x) >> 31) == 0)
 #define fp_int_to_fp(n) ((n)*F)
 #define fp_x_to_integer_round_to_zero(x) ((x)/F)
-#define fp_x_to_integer_round_to_nearest(x) ((x)>=0 ? ((x) + F/2)/F : ((x) - F/2)/F)
+#define fp_x_to_integer_round_to_nearest(x) (fp_is_positive(x) ? ((x) + F/2)/F : ((x) - F/2)/F)
 #define fp_add(x, y) ((x) + (y))
 #define fp_sub(x, y) ((x) - (y))
 #define fp_add_fp_and_int(x, n) ((x) + (n)*F)
