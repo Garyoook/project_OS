@@ -147,19 +147,14 @@ threads_ready(void) {
 
 
 void update_load_avg() {
-//   load_avg = fp_add(fp_divide_x_by_n(fp_multi_fp_int(load_avg, 59), 60),
-//      fp_multi_fp_int(fp_divide_x_by_n(fp_int_to_fp(1), 60),
-//          (threads_ready() + thread_current() == idle_thread ? 0 : 1)));
+  load_avg = fp_add(fp_divide_x_by_n(fp_multi_fp_int(load_avg, 59), 60), fp_divide_x_by_n(fp_int_to_fp (threads_ready() + (thread_current() != idle_thread ? 1 : 0)), 60));
 
 
-  load_avg = fp_add(fp_multi(fp_frac(59, 60), load_avg), fp_multi_fp_int((fp_frac(1, 60)),
-  (int) (threads_ready() + (thread_current() != idle_thread ? 1 : 0))));
+//  load_avg = fp_add(fp_multi(fp_frac(59, 60), load_avg), fp_multi_fp_int((fp_frac(1, 60)),
+//  (int) (threads_ready() + (thread_current() != idle_thread ? 1 : 0))));
 }
 
 void update_recent_cpu() {
-//  struct thread *cur = thread_current();
-//  fp cpu_fp = cur->recent_cpu;
-//  cur->recent_cpu = fp_add_fp_and_int(fp_multi(fp_divide(fp_multi_fp_int(load_avg, 2), fp_add_fp_and_int(fp_multi_fp_int(load_avg, 2), 1)), cpu_fp), thread_get_nice());
 
   struct list_elem *e;
   for (e = list_begin(&all_list); e != list_end(&all_list);
@@ -169,18 +164,6 @@ void update_recent_cpu() {
     t->recent_cpu = fp_add_fp_and_int(fp_multi(fp_divide(fp_multi_fp_int(load_avg, 2), fp_add_fp_and_int(fp_multi_fp_int(load_avg, 2), 1)), cpu_t), t->nice);
   }
 
-
-//  struct list_elem *e;
-//  for (e = list_begin(&all_list); e != list_end(&all_list);
-//       e = list_next(e)) {
-//    struct thread *t = list_entry (e, struct thread, allelem);
-//    if (t != idle_thread) {
-//      fp cpu_fp = t->recent_cpu;
-//      t->recent_cpu = fp_add_fp_and_int(fp_multi(fp_divide(fp_multi_fp_int(load_avg, 2),
-//                                                           (fp_add_fp_and_int(fp_multi_fp_int(load_avg, 2), 1))),
-//                                                 cpu_fp), t->nice);
-//    }
-//  }
 }
 
 
@@ -209,13 +192,13 @@ thread_tick(void) {
 #endif
   else {
     kernel_ticks++;
+    t->recent_cpu = fp_add_fp_and_int(t->recent_cpu, 1);
   }
 //++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
 if (thread_mlfqs) {
   if (timer_ticks() % TIME_SLICE == 0) {
-    if (t != idle_thread) {
-      t->recent_cpu = fp_add_fp_and_int(t->recent_cpu, 1);
-    }
 
     t->priority = mlfqs_calculatePriority(t);
     struct list_elem *e;
