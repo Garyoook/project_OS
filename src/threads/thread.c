@@ -137,10 +137,10 @@ threads_ready(void) {
   return list_size(&ready_list);
 }
 
-int mlfqs_calculatePriority() {
+int mlfqs_calculatePriority(struct thread *t) {
   int new_pri =fp_x_to_integer_round_to_nearest(fp_sub (fp_int_to_fp(PRI_MAX),
       fp_x_to_integer_round_to_nearest(fp_add(fp_divide_x_by_n
-      (thread_current()->recent_cpu, 4), thread_get_nice() * 2))));
+      (t->recent_cpu, 4), t->nice * 2))));
   if (new_pri < PRI_MIN) {
     new_pri = PRI_MIN;
   }
@@ -152,7 +152,7 @@ int mlfqs_calculatePriority() {
 
 void update_load_avg() {
   load_avg = fp_add(fp_multi(fp_frac(59, 60), load_avg), fp_multi_fp_int((fp_frac(1, 60)),
-      (int) (threads_ready() + (thread_current() != idle_thread ? 1 : 0))));
+  (int) (threads_ready() + (thread_current() != idle_thread ? 1 : 0))));
 }
 
 void update_recent_cpu() {
@@ -175,15 +175,13 @@ void update_BSD() {
   update_load_avg();
   update_recent_cpu();
 
-
-
   struct list_elem *e;
 
   for (e = list_begin (&ready_list); e != list_end (&ready_list);
        e = list_next (e))
   {
     struct thread *thr = list_entry (e, struct thread, elem);
-    thr->priority = mlfqs_calculatePriority();
+    thr->priority = mlfqs_calculatePriority(thr);
     /*--------------------------------------------------------------------------*/
   }
 
@@ -212,14 +210,16 @@ thread_tick(void) {
   }
 //++++++++++++++++++++++++++++++++++++++++++++++++++
   if (thread_mlfqs) {
-    if (kernel_ticks % TIMER_FREQ == 0) {
-      update_BSD();
-    }
-
     if (kernel_ticks % TIME_SLICE == 0) {
       // recalculate the priority: ------------------------------------------------
-      thread_current()->recent_cpu = fp_add_fp_and_int(thread_current()->recent_cpu, 1);
-      thread_set_priority(mlfqs_calculatePriority());
+      if (t != idle_thread) {
+        thread_current()->recent_cpu = fp_add_fp_and_int(thread_current()->recent_cpu, 1);
+      }
+      thread_current()->priority = (mlfqs_calculatePriority(thread_current()));
+    }
+
+    if (kernel_ticks % TIMER_FREQ == 0) {
+      update_BSD();
     }
   }
 
@@ -277,7 +277,7 @@ thread_create(const char *name, int priority,
       t->recent_cpu = thread_current()->recent_cpu;
       t->nice = thread_current()->nice;
     }
-    priority = mlfqs_calculatePriority();
+    t->priority = mlfqs_calculatePriority(t);
   }
 
   /* Initialize thread. */
@@ -565,7 +565,7 @@ thread_set_nice(int new_nice) {
   cur->nice = new_nice;
 
   // recalculate the priority: ------------------------------------------------
-  thread_current()->priority = mlfqs_calculatePriority();
+  thread_current()->priority = mlfqs_calculatePriority(cur);
   /*--------------------------------------------------------------------------*/
 
   // see if the current thread has the highest priority, if not, yield;
@@ -583,13 +583,13 @@ thread_get_nice(void) {
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg(void) {
-  return fp_x_to_integer_round_to_nearest(fp_multi_fp_int(load_avg, 100));
+  return (int) fp_x_to_integer_round_to_nearest(fp_multi_fp_int(load_avg, 100));
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu(void) {
-  return fp_x_to_integer_round_to_nearest(fp_multi_fp_int(thread_current()->recent_cpu, 100));
+  return (int) fp_x_to_integer_round_to_nearest(fp_multi_fp_int(thread_current()->recent_cpu, 100));
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
