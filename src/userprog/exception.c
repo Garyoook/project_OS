@@ -69,7 +69,7 @@ exception_print_stats (void)
 
 /* Handler for an exception (probably) caused by a user process. */
 static void
-kill (struct intr_frame *f)
+kill (struct intr_frame *f) 
 {
   /* This interrupt is one (probably) caused by a user process.
      For example, the process might have tried to access unmapped
@@ -120,7 +120,7 @@ kill (struct intr_frame *f)
    description of "Interrupt 14--Page Fault Exception (#PF)" in
    [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
 static void
-page_fault (struct intr_frame *f)
+page_fault (struct intr_frame *f) 
 {
   bool not_present;  /* True: not-present page, false: writing r/o page. */
   bool write;        /* True: access was write, false: access was read. */

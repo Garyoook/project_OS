@@ -207,7 +207,7 @@ putc_poll (uint8_t byte)
 
 /* Serial interrupt handler. */
 static void
-serial_interrupt (struct intr_frame *f UNUSED)
+serial_interrupt (struct intr_frame *f UNUSED) 
 {
   /* Inquire about interrupt in UART.  Without this, we can
      occasionally miss an interrupt running under QEMU. */
