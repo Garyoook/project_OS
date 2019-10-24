@@ -95,9 +95,11 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
-    int64_t blocked_ticks;              /* If the thread is blocked, it will be unblock after blocked ticks. */       
+    int64_t blocked_ticks;              /* If the thread is blocked, it will be unblock after blocked ticks. */
     struct list_elem allelem;           /* List element for all threads list. */
 
+  /* Shared between thread.c and synch.c. */
+  struct list_elem elem;              /* List element. */
 
   // self defined:
   // for priority donation:
@@ -105,13 +107,10 @@ struct thread
     int currentPos;                     /* current position of array priorities;*/
     struct thread *donateTo;            /* A pointer to record the thread that this thread donate to*/
 
-
   // for BSD:
   int nice;
   fp recent_cpu;
 
-    /* Shared between thread.c and synch.c. */
-    struct list_elem elem;              /* List element. */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -164,7 +163,13 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
-bool compare_priority(const struct list_elem *e1, const struct list_elem *e2, void *aux);
+bool compare_priority(const struct list_elem *e1,
+                      const struct list_elem *e2, void *aux);
+int mlfqs_calculatePriority(struct thread *t);
 struct list *get_ready_list();
+void upDate_donate_chain(struct thread *t, int new_priority);
+void update_load_avg();
+void update_recent_cpu();
+void update_BSD();
 
 #endif /* threads/thread.h */
