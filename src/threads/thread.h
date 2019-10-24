@@ -100,12 +100,6 @@ struct thread
     int currentPos;
 
   //    self defied:
-  int base_priority;         /* Another representation of priority to cooperate with donations.*/
-  int nested_level;
-  struct list_elem *nested_next;
-  struct list_elem *nested_prev;
-  struct list donate_to_list;
-  struct list donated_from_list;
   // for BSD:
   int nice;
   fp recent_cpu;
