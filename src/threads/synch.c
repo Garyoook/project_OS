@@ -246,34 +246,34 @@ lock_acquire(struct lock *lock) {
   ASSERT (!intr_context());
   ASSERT (!lock_held_by_current_thread(lock));
 
-  if (lock->holder != NULL) {
+  if (!thread_mlfqs) {
+    if (lock->holder != NULL) {
+      if (lock->holder->status != THREAD_DYING)
+        upDate_donate_chain1(lock->holder, thread_get_priority());
 
-    if (lock->holder->status != THREAD_DYING)
-      upDate_donate_chain1(lock->holder, thread_get_priority());
+      if (!list_empty(&lock->semaphore.waiters)) {
+        int thisPrior =
+            list_entry(list_max(&lock->semaphore.waiters, compare_priority, NULL), struct thread, elem)->priority;
 
-    if (!list_empty(&lock->semaphore.waiters)){
-      int thisPrior =
-          list_entry(list_max(&lock->semaphore.waiters, compare_priority, NULL), struct thread, elem)->priority;
-
-      if (thread_get_priority() > thisPrior) {
-        for (int i = 1; i < 8; i++) {
-          if (lock->holder->priorities[i] == thisPrior) {
-            lock->holder->priorities[i] = thread_get_priority();
-            break;
+        if (thread_get_priority() > thisPrior) {
+          for (int i = 1; i < 8; i++) {
+            if (lock->holder->priorities[i] == thisPrior) {
+              lock->holder->priorities[i] = thread_get_priority();
+              break;
+            }
           }
         }
+      } else {
+        lock->holder->priorities[lock->holder->currentPos] = thread_get_priority();
+        lock->holder->currentPos++;
       }
 
-    } else {
-      lock->holder->priorities[lock->holder->currentPos] = thread_get_priority();
-      lock->holder->currentPos++;
-    }
+      if (thread_get_priority() > lock->holder->priority) {
+        lock->holder->priority = thread_get_priority();
+      }
 
-    if (thread_get_priority() > lock->holder->priority) {
-      lock->holder->priority = thread_get_priority();
+      thread_current()->donateTo = lock->holder;
     }
-
-    thread_current()->donateTo = lock->holder;
   }
 
   sema_down(&lock->semaphore);
@@ -335,39 +335,42 @@ lock_release(struct lock *lock) {
       list_entry(list_max(&lock->semaphore.waiters, compare_priority, NULL), struct thread, elem)->priority;
 
   //Set the priorities that lock->holder get donated to 0, because the lock is going to release.
-  for (int i = 1; i < 8; i++) {
-    if (lock->holder->priorities[i] == thisPrior) {
-      lock->holder->priorities[i] = 0;
-      break;
+  if (!thread_mlfqs) {
+    for (int i = 1; i < 8; i++) {
+      if (lock->holder->priorities[i] == thisPrior) {
+        lock->holder->priorities[i] = 0;
+        break;
+      }
     }
-  }
-  //------------------------------------------------------------------------
+    //------------------------------------------------------------------------
 
-  int newPrior;
-  newPrior = 0;
+    int newPrior;
+    newPrior = 0;
 
-  //Find next effective priority from the donation array, it should be the highest.
-  for (int i = 0; i < 8; i++) {
-    if (lock->holder->priorities[i] >= newPrior) {
-      newPrior = lock->holder->priorities[i];
+    //Find next effective priority from the donation array, it should be the highest.
+    for (int i = 0; i < 8; i++) {
+      if (lock->holder->priorities[i] >= newPrior) {
+        newPrior = lock->holder->priorities[i];
+      }
     }
-  }
+    //-----------------------------------------------
 
 
-  //-----------------------------------------------
+    lock->holder = NULL;
 
+    sema_up(&lock->semaphore);
 
-  lock->holder = NULL;
+    // If current thread isn't the highest priority, yield.
+    thread_current()->priority = newPrior;
+    if ((newPrior <= list_entry (list_max(get_ready_list(), compare_priority, NULL), struct thread, elem)->priority)
+        && (!list_empty(get_ready_list()))) {
+      thread_yield();
+    }
+  } else {
+    lock->holder = NULL;
 
+    sema_up(&lock->semaphore);
 
-
-  sema_up(&lock->semaphore);
-
-  // If current thread isn't the highest priority, yield.
-  thread_current()->priority = newPrior;
-  if ((newPrior <= list_entry (list_max(get_ready_list(), compare_priority, NULL), struct thread, elem)->priority)
-      && (!list_empty(get_ready_list()))){
-    thread_yield();
   }
 
 

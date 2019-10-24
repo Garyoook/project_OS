@@ -45,7 +45,7 @@ static struct lock set_lock;
 //
 
 //[Gary]: global var for BSD
-static fp load_avg = 0;
+static fp load_avg;
 
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame {
@@ -121,6 +121,8 @@ thread_init(void) {
   init_thread(initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid();
+
+  load_avg = fp_int_to_fp(0);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -158,7 +160,6 @@ void update_load_avg() {
 }
 
 void update_recent_cpu() {
-
   struct list_elem *e;
   for (e = list_begin(&all_list); e != list_end(&all_list);
        e = list_next(e)) {
