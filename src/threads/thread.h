@@ -84,6 +84,9 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
+
+#define MAX_LEVEL 8+1  /*Max level of donation*/
+
 struct thread
   {
     /* Owned by thread.c. */
@@ -95,11 +98,14 @@ struct thread
     int64_t blocked_ticks;              /* If the thread is blocked, it will be unblock after blocked ticks. */       
     struct list_elem allelem;           /* List element for all threads list. */
 
-    int priorities[20];
-    struct thread *donateTo;
-    int currentPos;
 
-  //    self defied:
+  // self defined:
+  // for priority donation:
+    int priorities[MAX_LEVEL];          /* An array of int to store priorities that this thread get donated*/
+    int currentPos;                     /* current position of array priorities;*/
+    struct thread *donateTo;            /* A pointer to record the thread that this thread donate to*/
+
+
   // for BSD:
   int nice;
   fp recent_cpu;

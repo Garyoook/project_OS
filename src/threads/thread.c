@@ -112,6 +112,7 @@ thread_init(void) {
   lock_init(&set_lock);
 //
   lock_init(&tid_lock);
+  lock_init(&set_lock);
   list_init(&ready_list);
   list_init(&all_list);
   list_init(&blocked_list);
@@ -520,7 +521,6 @@ thread_set_priority(int new_priority) {
       newPrior = thread_current()->priorities[i];
     }
   }
-
   thread_current()->priority = newPrior;
 
   lock_release(&set_lock);
