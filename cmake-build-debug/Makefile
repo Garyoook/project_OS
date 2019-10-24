@@ -5712,6 +5712,33 @@ src/tests/vm/qsort.c.s:
 	$(MAKE) -f CMakeFiles/pintos_47.dir/build.make CMakeFiles/pintos_47.dir/src/tests/vm/qsort.c.s
 .PHONY : src/tests/vm/qsort.c.s
 
+src/threads/fixed-point-test.o: src/threads/fixed-point-test.c.o
+
+.PHONY : src/threads/fixed-point-test.o
+
+# target to build an object file
+src/threads/fixed-point-test.c.o:
+	$(MAKE) -f CMakeFiles/pintos_47.dir/build.make CMakeFiles/pintos_47.dir/src/threads/fixed-point-test.c.o
+.PHONY : src/threads/fixed-point-test.c.o
+
+src/threads/fixed-point-test.i: src/threads/fixed-point-test.c.i
+
+.PHONY : src/threads/fixed-point-test.i
+
+# target to preprocess a source file
+src/threads/fixed-point-test.c.i:
+	$(MAKE) -f CMakeFiles/pintos_47.dir/build.make CMakeFiles/pintos_47.dir/src/threads/fixed-point-test.c.i
+.PHONY : src/threads/fixed-point-test.c.i
+
+src/threads/fixed-point-test.s: src/threads/fixed-point-test.c.s
+
+.PHONY : src/threads/fixed-point-test.s
+
+# target to generate assembly for a file
+src/threads/fixed-point-test.c.s:
+	$(MAKE) -f CMakeFiles/pintos_47.dir/build.make CMakeFiles/pintos_47.dir/src/threads/fixed-point-test.c.s
+.PHONY : src/threads/fixed-point-test.c.s
+
 src/threads/init.o: src/threads/init.c.o
 
 .PHONY : src/threads/init.o
@@ -6747,6 +6774,9 @@ help:
 	@echo "... src/tests/vm/qsort.o"
 	@echo "... src/tests/vm/qsort.i"
 	@echo "... src/tests/vm/qsort.s"
+	@echo "... src/threads/fixed-point-test.o"
+	@echo "... src/threads/fixed-point-test.i"
+	@echo "... src/threads/fixed-point-test.s"
 	@echo "... src/threads/init.o"
 	@echo "... src/threads/init.i"
 	@echo "... src/threads/init.s"
