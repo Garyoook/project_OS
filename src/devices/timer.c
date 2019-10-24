@@ -101,15 +101,15 @@ timer_sleep (int64_t ticks)
 {
   int64_t start = timer_ticks ();
   ASSERT (intr_get_level () == INTR_ON);
-  
+
   enum intr_level old_level;
+  old_level = intr_disable ();
   int64_t estimate_ticks = ticks + start;
   struct thread *cur = thread_current();
-  
+
   set_thread_blocked_ticks(cur, estimate_ticks);
   list_insert_ordered(&blocked_list, &thread_current()->elem, compare_thread, NULL);
-  
-  old_level = intr_disable ();
+
   thread_block();
   intr_set_level (old_level);
 }
