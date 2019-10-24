@@ -61,9 +61,7 @@ void
 sema_down (struct semaphore *sema) 
 {
   enum intr_level old_level;
-  struct thread *pre;
-  struct thread *cur;
-
+  
   ASSERT (sema != NULL);
   ASSERT (!intr_context ());
 
@@ -71,16 +69,7 @@ sema_down (struct semaphore *sema)
   while (sema->value == 0) 
     {
       list_push_back (&sema->waiters, &thread_current ()->elem);
-      pre = thread_current();
       thread_block ();
-      cur = thread_current();
-      
-      if (pre->current_priority_donation_depth < NESTED_PRIORITY_DONATION_DEPTH && 
-          pre->priority > cur->priority) {
-        cur->previous_priorities[cur->current_priority_donation_depth] = cur->priority;
-        cur->current_priority_donation_depth++;
-        cur->priority = pre->priority;
-      }
     }
   sema->value--;
   intr_set_level (old_level);
@@ -120,15 +109,11 @@ void
 sema_up (struct semaphore *sema) 
 {
   enum intr_level old_level;
-  struct thread *pre;
 
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters)) {
-    pre = thread_current();
-    pre->priority = pre->previous_priorities[pre->current_priority_donation_depth];
-    pre->current_priority_donation_depth--;
     thread_unblock (list_entry (list_pop_front (&sema->waiters),
                                 struct thread, elem));
     
@@ -209,11 +194,25 @@ lock_init (struct lock *lock)
 void
 lock_acquire (struct lock *lock)
 {
+
+  struct thread *pre;
+  struct thread *cur;
+
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
+  pre = thread_current();
   sema_down (&lock->semaphore);
+  cur = thread_current();
+  
+  if (pre->current_priority_donation_depth < NESTED_PRIORITY_DONATION_DEPTH && 
+      pre->priority > cur->priority) {
+        cur->previous_priorities[cur->current_priority_donation_depth] = cur->priority;
+        cur->current_priority_donation_depth++;
+        cur->priority = pre->priority;
+      }
+  
   lock->holder = thread_current ();
 }
 
@@ -245,10 +244,15 @@ lock_try_acquire (struct lock *lock)
 void
 lock_release (struct lock *lock) 
 {
+  struct thread *pre;
+  
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
   lock->holder = NULL;
+  pre = thread_current();
+    pre->priority = pre->previous_priorities[pre->current_priority_donation_depth];
+    pre->current_priority_donation_depth--;
   sema_up (&lock->semaphore);
 }
 
