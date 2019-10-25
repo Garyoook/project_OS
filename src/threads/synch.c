@@ -212,12 +212,7 @@ lock_acquire(struct lock *lock) {
                                 NULL), struct thread, elem)->priority;
 
         if (thread_get_priority() > thisPrior) {
-          for (int i = 1; i < MAX_LEVEL; i++) {
-            if (lock->holder->priorities[i] == thisPrior) {
-              lock->holder->priorities[i] = thread_get_priority();
-              break;
-            }
-          }
+          update_priority(lock->holder->priorities, thisPrior, thread_get_priority());
         }
       } else {
         lock->holder->priorities[lock->holder->currentPos] =
@@ -276,6 +271,14 @@ lock_try_acquire(struct lock *lock) {
   return success;
 }
 
+void update_priority(int prior[], int old, int new){
+  for (int i = 1; i < MAX_LEVEL; i++) {
+    if (prior[i] == old) {
+      prior[i] = new;
+      break;
+    }
+  }
+}
 /* Releases LOCK, which must be owned by the current thread.
 
    An interrupt handler cannot acquire a lock, so it does not
@@ -290,23 +293,12 @@ lock_release(struct lock *lock) {
   //Set the priorities that lock->holder get donated to 0,
   // because the lock is going to release.
   if (!thread_mlfqs) {
-    for (int i = 1; i < MAX_LEVEL; i++) {
-      if (lock->holder->priorities[i] == thisPrior) {
-        lock->holder->priorities[i] = 0;
-        break;
-      }
-    }
+
+    update_priority(lock->holder->priorities, thisPrior, 0);
+
 
     int newPrior;
-    newPrior = 0;
-
-    //Find next effective priority from the donation array,
-    // it should be the highest.
-    for (int i = 0; i < MAX_LEVEL; i++) {
-      if (lock->holder->priorities[i] >= newPrior) {
-        newPrior = lock->holder->priorities[i];
-      }
-    }
+    newPrior = recalculate_effective_priority(lock->holder->priorities);
 
 
     lock->holder = NULL;
