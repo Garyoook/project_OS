@@ -212,7 +212,12 @@ lock_acquire(struct lock *lock) {
                                 NULL), struct thread, elem)->priority;
 
         if (thread_get_priority() > thisPrior) {
-          update_priority(lock->holder->priorities, thisPrior, thread_get_priority());
+          for (int i = 1; i < MAX_LEVEL; i++) {
+            if (lock->holder->priorities[i] == thisPrior) {
+              lock->holder->priorities[i] = thread_get_priority();
+              break;
+            }
+          }
         }
       } else {
         lock->holder->priorities[lock->holder->currentPos] =
@@ -271,14 +276,6 @@ lock_try_acquire(struct lock *lock) {
   return success;
 }
 
-void update_priority(int prior[], int old, int new){
-  for (int i = 1; i < MAX_LEVEL; i++) {
-    if (prior[i] == old) {
-      prior[i] = new;
-      break;
-    }
-  }
-}
 /* Releases LOCK, which must be owned by the current thread.
 
    An interrupt handler cannot acquire a lock, so it does not
@@ -293,12 +290,23 @@ lock_release(struct lock *lock) {
   //Set the priorities that lock->holder get donated to 0,
   // because the lock is going to release.
   if (!thread_mlfqs) {
-
-    update_priority(lock->holder->priorities, thisPrior, 0);
-
+    for (int i = 1; i < MAX_LEVEL; i++) {
+      if (lock->holder->priorities[i] == thisPrior) {
+        lock->holder->priorities[i] = 0;
+        break;
+      }
+    }
 
     int newPrior;
-    newPrior = recalculate_effective_priority(lock->holder->priorities);
+    newPrior = 0;
+
+    //Find next effective priority from the donation array,
+    // it should be the highest.
+    for (int i = 0; i < MAX_LEVEL; i++) {
+      if (lock->holder->priorities[i] >= newPrior) {
+        newPrior = lock->holder->priorities[i];
+      }
+    }
 
 
     lock->holder = NULL;
@@ -307,9 +315,9 @@ lock_release(struct lock *lock) {
 
     // If current thread isn't the highest priority, yield.
     thread_current()->priority = newPrior;
-    if ((!list_empty(get_ready_list())) &&
-    (newPrior <= list_entry (list_max(get_ready_list(),
-        compare_priority, NULL), struct thread, elem)->priority)) {
+    if ((newPrior <= list_entry (list_max(get_ready_list(),
+                                          compare_priority, NULL), struct thread, elem)->priority)
+        && (!list_empty(get_ready_list()))) {
       thread_yield();
     }
   } else {

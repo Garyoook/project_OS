@@ -486,23 +486,18 @@ void upDate_donate_chain(struct thread *donatedFrom, int new_priority) {
       upDate_donate_chain(getDonate, new_priority);
       getDonate->priority = new_priority;
     }
-    update_priority(getDonate->priorities,
-        donatedFrom->priority, new_priority);
+    for (int i = 1; i < MAX_LEVEL; i++) {
+      if (getDonate->priorities[i] == donatedFrom->priority) {
+        getDonate->priorities[i] = new_priority;
+        break;
+      }
+    }
+
   }
 }
 
 struct list *get_ready_list(void) {
   return &ready_list;
-}
-
-int recalculate_effective_priority(int const priorities[]){
-  int newPrior = 0;
-  for (int i = 0; i < MAX_LEVEL; i++) {
-    if (priorities[i] > newPrior) {
-      newPrior = priorities[i];
-    }
-  }
-  return newPrior;
 }
 
 void
@@ -511,8 +506,12 @@ thread_set_priority(int new_priority) {
   thread_current()->priorities[0] = new_priority;
 
   lock_acquire(&set_lock);
-  int newPrior =
-      recalculate_effective_priority(thread_current()->priorities);
+  int newPrior = 0;
+  for (int i = 0; i < MAX_LEVEL; i++) {
+    if (thread_current()->priorities[i] > newPrior) {
+      newPrior = thread_current()->priorities[i];
+    }
+  }
   thread_current()->priority = newPrior;
 
   lock_release(&set_lock);
@@ -719,15 +718,14 @@ next_thread_to_run(void) {
 }
 
 
-/* New function: Returns true if priority for t1 is
- * bigger than priority for t2 */
+/* New function: Returns true if priority for t1 is bigger than priority for t2 */
 bool compare_priority(const struct list_elem *e1,
     const struct list_elem *e2, void *aux UNUSED) {
   struct thread *t1 = list_entry(e1, struct thread, elem);
   struct thread *t2 = list_entry(e2, struct thread, elem);
   return t1->priority < t2->priority;
 }
-
+//
 
 /* Completes a thread switch by activating the new thread's page
    tables, and, if the previous thread is dying, destroying it.

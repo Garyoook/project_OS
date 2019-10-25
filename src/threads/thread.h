@@ -171,7 +171,5 @@ void upDate_donate_chain(struct thread *t, int new_priority);
 void update_load_avg(void);
 void update_recent_cpu(void);
 void update_BSD(void);
-void update_priority(int prior[], int old, int new);
-int recalculate_effective_priority(int const priorities[]);
 
 #endif /* threads/thread.h */
