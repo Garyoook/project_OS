@@ -486,7 +486,7 @@ void upDate_donate_chain(struct thread *donatedFrom, int new_priority) {
       upDate_donate_chain(getDonate, new_priority);
       getDonate->priority = new_priority;
     }
-    for (int i = 1; i < 8; i++) {
+    for (int i = 1; i < MAX_LEVEL; i++) {
       if (getDonate->priorities[i] == donatedFrom->priority) {
         getDonate->priorities[i] = new_priority;
         break;
@@ -507,7 +507,7 @@ thread_set_priority(int new_priority) {
 
   lock_acquire(&set_lock);
   int newPrior = 0;
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < MAX_LEVEL; i++) {
     if (thread_current()->priorities[i] > newPrior) {
       newPrior = thread_current()->priorities[i];
     }
@@ -671,7 +671,7 @@ init_thread(struct thread *t, const char *name, int priority) {
   }
 
 //  to initialise added field "priorities";
-  for (int i = 1; i < 8; i++) {
+  for (int i = 1; i < MAX_LEVEL; i++) {
     t->priorities[i] = 0;
   }
 

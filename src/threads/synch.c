@@ -212,7 +212,7 @@ lock_acquire(struct lock *lock) {
                                 NULL), struct thread, elem)->priority;
 
         if (thread_get_priority() > thisPrior) {
-          for (int i = 1; i < 8; i++) {
+          for (int i = 1; i < MAX_LEVEL; i++) {
             if (lock->holder->priorities[i] == thisPrior) {
               lock->holder->priorities[i] = thread_get_priority();
               break;
@@ -223,6 +223,9 @@ lock_acquire(struct lock *lock) {
         lock->holder->priorities[lock->holder->currentPos] =
             thread_get_priority();
         lock->holder->currentPos++;
+        if (lock->holder->currentPos == MAX_LEVEL){
+          lock->holder->currentPos = 1;
+        }
       }
 
       if (thread_get_priority() > lock->holder->priority) {
@@ -241,6 +244,9 @@ lock_acquire(struct lock *lock) {
                             NULL), struct thread, elem)->priority;
     thread_current()->priorities[thread_current()->currentPos] = thisPrior;
     thread_current()->currentPos++;
+    if (thread_current()->currentPos == MAX_LEVEL){
+      thread_current()->currentPos = 1;
+    }
     if (thread_get_priority() <= thisPrior) {
       thread_current()->priority = thisPrior;
     }
@@ -284,7 +290,7 @@ lock_release(struct lock *lock) {
   //Set the priorities that lock->holder get donated to 0,
   // because the lock is going to release.
   if (!thread_mlfqs) {
-    for (int i = 1; i < 8; i++) {
+    for (int i = 1; i < MAX_LEVEL; i++) {
       if (lock->holder->priorities[i] == thisPrior) {
         lock->holder->priorities[i] = 0;
         break;
@@ -296,7 +302,7 @@ lock_release(struct lock *lock) {
 
     //Find next effective priority from the donation array,
     // it should be the highest.
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < MAX_LEVEL; i++) {
       if (lock->holder->priorities[i] >= newPrior) {
         newPrior = lock->holder->priorities[i];
       }
