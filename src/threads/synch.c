@@ -307,9 +307,9 @@ lock_release(struct lock *lock) {
 
     // If current thread isn't the highest priority, yield.
     thread_current()->priority = newPrior;
-    if ((newPrior <= list_entry (list_max(get_ready_list(),
-                                          compare_priority, NULL), struct thread, elem)->priority)
-        && (!list_empty(get_ready_list()))) {
+    if ((!list_empty(get_ready_list())) &&
+    (newPrior <= list_entry (list_max(get_ready_list(),
+        compare_priority, NULL), struct thread, elem)->priority)) {
       thread_yield();
     }
   } else {
