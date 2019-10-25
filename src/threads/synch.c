@@ -193,27 +193,7 @@ lock_init(struct lock *lock) {
    we need to sleep. */
 
 // Helper function that recursively update the donate chain.
-void upDate_donate_chain1(struct thread *donatedFrom, int new_priority) {
-  if ((donatedFrom != NULL) && (donatedFrom->status != THREAD_DYING) &&
-      (donatedFrom->donateTo != NULL) &&
-      donatedFrom->donateTo->status != THREAD_DYING) {
-    // donater is the thread, that current_thread() donate to;
-    // which means current_thread() has donated to donater;
-    struct thread *getDonate = donatedFrom->donateTo;
-    int p = donatedFrom->priority;
-    if (p == getDonate->priority) {
-      upDate_donate_chain1(getDonate, new_priority);
-      getDonate->priority = new_priority;
-    }
-    for (int i = 1; i < 8; i++) {
-      if (getDonate->priorities[i] == donatedFrom->priority) {
-        getDonate->priorities[i] = new_priority;
-        break;
-      }
-    }
 
-  }
-}
 
 void
 lock_acquire(struct lock *lock) {
@@ -224,7 +204,7 @@ lock_acquire(struct lock *lock) {
   if (!thread_mlfqs) {
     if (lock->holder != NULL) {
       if (lock->holder->status != THREAD_DYING)
-        upDate_donate_chain1(lock->holder, thread_get_priority());
+        upDate_donate_chain(lock->holder, thread_get_priority());
 
       if (!list_empty(&lock->semaphore.waiters)) {
         int thisPrior =

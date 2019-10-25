@@ -146,7 +146,7 @@ threads_ready(void) {
 }
 
 
-void update_load_avg() {
+void update_load_avg(void) {
   int t1 = fp_multi(59 * F / 60, load_avg);
   int ready_thread_size = (int) (threads_ready() +
                                  (thread_current() != idle_thread ? 1 : 0));
@@ -154,7 +154,7 @@ void update_load_avg() {
   load_avg = fp_add(t1, t2);
 }
 
-void update_recent_cpu() {
+void update_recent_cpu(void) {
   struct list_elem *e;
   for (e = list_begin(&all_list); e != list_end(&all_list);
        e = list_next(e)) {
@@ -169,7 +169,7 @@ void update_recent_cpu() {
 }
 
 //[Gary]: update the load_avg and recent_cpu in this function
-void update_BSD() {
+void update_BSD(void) {
   update_load_avg();
   update_recent_cpu();
 }
@@ -474,24 +474,29 @@ set_thread_blocked_ticks(struct thread *t, int64_t ticks) {
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
-void upDate_donate_chain(struct thread *t, int new_priority) {
-  if ((t != NULL) && (t->donateTo != NULL)) {
-    struct thread *donater = (t->donateTo);
-
-    if (t->priority == donater->priority) {
-      upDate_donate_chain(donater, new_priority);
-      donater->priority = new_priority;
-    } else {
-      for (int i = 1; i < 8; i++) {
-        if (donater->priorities[i] == t->priority) {
-          donater->priorities[i] = new_priority;
-        }
+void upDate_donate_chain(struct thread *donatedFrom, int new_priority) {
+  if ((donatedFrom != NULL) && (donatedFrom->status != THREAD_DYING) &&
+      (donatedFrom->donateTo != NULL) &&
+      donatedFrom->donateTo->status != THREAD_DYING) {
+    // donater is the thread, that current_thread() donate to;
+    // which means current_thread() has donated to donater;
+    struct thread *getDonate = donatedFrom->donateTo;
+    int p = donatedFrom->priority;
+    if (p == getDonate->priority) {
+      upDate_donate_chain(getDonate, new_priority);
+      getDonate->priority = new_priority;
+    }
+    for (int i = 1; i < 8; i++) {
+      if (getDonate->priorities[i] == donatedFrom->priority) {
+        getDonate->priorities[i] = new_priority;
+        break;
       }
     }
+
   }
 }
 
-struct list *get_ready_list() {
+struct list *get_ready_list(void) {
   return &ready_list;
 }
 
