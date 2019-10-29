@@ -308,13 +308,11 @@ lock_release(struct lock *lock) {
       }
     }
 
-
     lock->holder = NULL;
-
+    thread_current()->priority = newPrior;
     sema_up(&lock->semaphore);
 
     // If current thread isn't the highest priority, yield.
-    thread_current()->priority = newPrior;
     if ((newPrior <= list_entry (list_max(get_ready_list(),
                                           compare_priority, NULL), struct thread, elem)->priority)
         && (!list_empty(get_ready_list()))) {
@@ -324,7 +322,6 @@ lock_release(struct lock *lock) {
     lock->holder = NULL;
 
     sema_up(&lock->semaphore);
-
   }
 
 
