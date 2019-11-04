@@ -201,6 +201,8 @@ lock_acquire(struct lock *lock) {
   ASSERT (!intr_context());
   ASSERT (!lock_held_by_current_thread(lock));
 
+  enum intr_level old_level;
+  old_level = intr_disable();
   if (!thread_mlfqs) {
     if (lock->holder != NULL) {
       if (lock->holder->status != THREAD_DYING)
@@ -237,6 +239,8 @@ lock_acquire(struct lock *lock) {
   }
 
   sema_down(&lock->semaphore);
+
+  intr_set_level(old_level);
 
   if (!list_empty(&lock->semaphore.waiters)) {
     int thisPrior =
@@ -289,6 +293,10 @@ lock_release(struct lock *lock) {
 
   //Set the priorities that lock->holder get donated to 0,
   // because the lock is going to release.
+
+
+  enum intr_level old_level;
+  old_level = intr_disable();
   if (!thread_mlfqs) {
     for (int i = 1; i < MAX_LEVEL; i++) {
       if (lock->holder->priorities[i] == thisPrior) {
@@ -323,6 +331,7 @@ lock_release(struct lock *lock) {
 
     sema_up(&lock->semaphore);
   }
+  intr_set_level(old_level);
 
 
 }
