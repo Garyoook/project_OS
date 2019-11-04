@@ -208,6 +208,34 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 bool
 load (const char *file_name, void (**eip) (void), void **esp) 
 {
+//
+  size_t cmdLen = strlen(file_name);
+  char s[cmdLen];
+  strlcpy(s, file_name, cmdLen);
+
+  char *token, *save_ptr;
+
+  char argArr[8];
+  char *ptrArr[8];
+  int j = 0, k = 0;
+  int argc = 0;
+  uint8_t word_align = 0;
+
+  for (token = strtok_r (s, " ", &save_ptr); token != NULL;
+       token = strtok_r (NULL, " ", &save_ptr)) {
+    argArr[j] = *token;
+  }
+  argArr[j] = word_align;
+
+  ptrArr[k] = 0;
+  k++;
+  for (token = strtok_r (s, " ", &save_ptr); token != NULL;
+        token = strtok_r (NULL, " ", &save_ptr)) {
+    ptrArr[k] = save_ptr;
+    k++;
+  }
+//
+
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
@@ -427,7 +455,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp) 
+setup_stack (void **esp)
 {
   uint8_t *kpage;
   bool success = false;
@@ -437,7 +465,7 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE;
+        *esp = PHYS_BASE - 12;
       else
         palloc_free_page (kpage);
     }
