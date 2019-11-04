@@ -108,8 +108,8 @@ struct thread
     struct thread *donateTo;            /* A pointer to record the thread that this thread donate to*/
 
   // for BSD:
-  int nice;
-  fp recent_cpu;
+    int nice;
+    fp recent_cpu;
 
 
 #ifdef USERPROG

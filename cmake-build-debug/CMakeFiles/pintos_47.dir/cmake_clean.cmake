@@ -221,7 +221,6 @@ file(REMOVE_RECURSE
   "CMakeFiles/pintos_47.dir/src/utils/setitimer-helper.c.o"
   "CMakeFiles/pintos_47.dir/src/utils/squish-pty.c.o"
   "CMakeFiles/pintos_47.dir/src/utils/squish-unix.c.o"
-  "CMakeFiles/pintos_47.dir/src/threads/fixed-point-test.c.o"
   "pintos_47.pdb"
   "pintos_47"
 )

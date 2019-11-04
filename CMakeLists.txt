@@ -318,4 +318,6 @@ add_executable(pintos_47
         src/userprog/tss.h
         src/utils/setitimer-helper.c
         src/utils/squish-pty.c
-        src/utils/squish-unix.c src/threads/fixed-point.h src/threads/fixed-point-test.c)
+        src/utils/squish-unix.c src/threads/fixed-point.h)
+
+add_definitions(-DUSERPROG -DFILESYS)
