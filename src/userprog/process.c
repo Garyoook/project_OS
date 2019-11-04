@@ -195,18 +195,34 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack(void **esp, char argArr[8], char *ptrArr[8], int argc);
+static bool setup_stack(void **esp, char **argArr, int argc);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
                           bool writable);
+int get_argc(const char *file_name);
+
+int get_argc(const char *file_name) {
+  size_t cmdLen = strlen(file_name);
+  char s[cmdLen];
+  strlcpy(s, file_name, cmdLen);
+  char *token, *save_ptr;
+  int argc = 0;
+
+  for (token = strtok_r (s, " ", &save_ptr); token != NULL;
+       token = strtok_r (NULL, " ", &save_ptr)) {
+    argc++;
+  }
+  return argc;
+}
 
 /* Loads an ELF executable from FILE_NAME into the current thread.
    Stores the executable's entry point into *EIP
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
+
 bool
-load (const char *file_name, void (**eip) (void), void **esp) 
+load (const char *file_name, void (**eip) (void), void **esp)
 {
 //
   size_t cmdLen = strlen(file_name);
@@ -214,24 +230,16 @@ load (const char *file_name, void (**eip) (void), void **esp)
   strlcpy(s, file_name, cmdLen);
 
   char *token, *save_ptr;
-
-  char argArr[8];
-  char *ptrArr[8];
-  int j = 0, k = 0;
-  int argc = 0;
-  uint8_t word_align = 0;
+  int j = 0;
+  int argc = get_argc(file_name);
+  char *argArr[argc];
 
   for (token = strtok_r (s, " ", &save_ptr); token != NULL;
        token = strtok_r (NULL, " ", &save_ptr)) {
-    argArr[j] = *token;
-    argc++;
+    argArr[j] = token;
+    j++;
   }
-
-  for (token = strtok_r (s, " ", &save_ptr); token != NULL;
-        token = strtok_r (NULL, " ", &save_ptr)) {
-    ptrArr[k] = save_ptr;
-    k++;
-  }
+  argArr[j] = 0;
 //
 
   struct thread *t = thread_current ();
@@ -328,7 +336,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack(esp, argArr, ptrArr, argc))
+  if (!setup_stack(esp, argArr, argc))
     goto done;
 
   /* Start address. */
@@ -453,7 +461,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack(void **esp, char argArr[8], char *ptrArr[8], int argc)
+setup_stack(void **esp, char **argArr , int argc)
 {
   uint8_t *kpage;
   bool success = false;
@@ -464,9 +472,34 @@ setup_stack(void **esp, char argArr[8], char *ptrArr[8], int argc)
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
         *esp = PHYS_BASE - 12;
-      else
-        palloc_free_page (kpage);
+      else {
+        palloc_free_page(kpage);
+        return success;
+      }
     }
+
+    // push the arguments on the stack;
+    for (int i = argc - 1; i > 0; i--) {
+      *esp = *esp - sizeof(argArr[i]);
+      memcpy(*esp,  argArr[i], sizeof(&argArr[i]));
+    }
+    // push the word align on the stack;
+    uint8_t word_align = 0;
+    *esp = *esp - sizeof(word_align);
+    memcpy(*esp, &word_align, sizeof(uint8_t));
+
+    for (int i = argc; i > 0; i--) {
+      *esp = *esp - sizeof(char *);
+      memcpy(*esp, &argArr[i], sizeof(char *));
+    }
+
+    *esp = *esp - sizeof(int);
+    memcpy(*esp, &argc, sizeof(int));
+
+    *esp = *esp - sizeof(void *);
+    memcpy(*esp, argArr[argc], sizeof(void *));
+
+
   return success;
 }
 
