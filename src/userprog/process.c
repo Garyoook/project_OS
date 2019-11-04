@@ -485,7 +485,7 @@ setup_stack(void **esp, char **argArr , int argc)
     }
     // push the word align on the stack;
     uint8_t word_align = 0;
-    *esp = *esp - sizeof(word_align);
+    *esp = *esp - sizeof(uint8_t);
     memcpy(*esp, &word_align, sizeof(uint8_t));
 
     for (int i = argc; i > 0; i--) {
