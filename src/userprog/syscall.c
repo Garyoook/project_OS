@@ -15,8 +15,19 @@ syscall_init (void)
 }
 
 static void
-syscall_handler (struct intr_frame *f UNUSED) 
+syscall_handler (struct intr_frame *f)
 {
+  void **stack = f->esp;
+  int *syscallNum = *stack;
+  *stack = *stack + sizeof(int *);
+  char *args[8];
+  int i = 0;
+  while (*stack != (uint8_t) 0) {
+    args[i] = *stack;
+    *stack = *stack + sizeof(args[i]);
+    i++;
+  }
+
   printf ("system call!\n");
   thread_exit ();
 }
