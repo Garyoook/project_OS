@@ -1,9 +1,7 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
-// stscall-nr include all functions names
 #include <syscall-nr.h>
 #include <user/syscall.h>
-#include <vaddr.h>
 #include "devices/shutdown.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
@@ -19,10 +17,6 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  // user stack esp
-  if (f->esp > PHYS_BASE) {
-    // fail the handler
-  }
   printf ("system call!\n");
   thread_exit ();
 }
@@ -64,12 +58,7 @@ open(const char *file) {
 
 int
 filesize(int fd) {
-  int bits = 0;
-  while (fd>=1) {
-    bits++;
-    fd /= 2;
-  }
-  return bits/8;
+
 }
 
 int
