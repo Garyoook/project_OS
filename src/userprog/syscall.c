@@ -5,6 +5,8 @@
 #include "devices/shutdown.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "process.h"
+#include "file.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -28,7 +30,8 @@ halt(void) {
 
 void
 exit (int status) {
-
+  printf("%s: exit(%d)\n", thread_current()->name, thread_current()->status);
+  process_exit();
 }
 
 pid_t
@@ -38,7 +41,10 @@ exec(const char *cmd_line) {
 
 int
 wait(pid_t pid) {
-
+  struct thread *t = &pid;
+  if (t->status == THREAD_DYING){
+    return THREAD_DYING;
+  }
 }
 
 bool
@@ -67,7 +73,18 @@ read(int fd, void *buffer, unsigned size) {
 }
 
 int
-write(int fd, void *buffer, unsigned size) {
+write(int fd, const void *buffer, unsigned size) {
+
+  if (fd == 1) {
+    putbuf(buffer, size);
+  }
+
+  int current = file_tell(fd);
+  if (current < file_length(fd)) {
+    return file_write_at(fd, buffer, size, current);
+  } else {
+    return 0;
+  }
 
 }
 
