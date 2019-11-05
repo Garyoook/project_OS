@@ -18,8 +18,12 @@ static void
 syscall_handler (struct intr_frame *f)
 {
   void **stack = f->esp;
+
+  // pop the syscall number from the stack;
   int *syscallNum = *stack;
   *stack = *stack + sizeof(int *);
+
+  // pop the arguments from the stack;
   char *args[8];
   int i = 0;
   while (*stack != (uint8_t) 0) {
@@ -27,6 +31,9 @@ syscall_handler (struct intr_frame *f)
     *stack = *stack + sizeof(args[i]);
     i++;
   }
+
+  // question: how do we pass them in the "appropriate" function?
+  // and return result of the function to the f->eax;
 
   printf ("system call!\n");
   thread_exit ();
