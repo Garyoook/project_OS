@@ -102,7 +102,12 @@ open(const char *file) {
 
 int
 filesize(int fd) {
-
+  int bits=0;
+  while (fd>0) {
+    bits++;
+    fd /= 2;
+  }
+  return bits/8;
 }
 
 int
