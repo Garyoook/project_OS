@@ -675,6 +675,8 @@ init_thread(struct thread *t, const char *name, int priority) {
     t->priorities[i] = 0;
   }
 
+  list_init(&t->locks);
+
   t->magic = THREAD_MAGIC;
   t->currentPos = 1;
 

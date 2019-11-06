@@ -23,3 +23,7 @@
 *.nav
 *.toc
 
+#ignore the following folders
+cmake-build-debug/
+.idea/
+

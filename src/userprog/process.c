@@ -21,12 +21,13 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t
-process_execute (const char *file_name) 
+process_execute (const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
@@ -45,8 +46,75 @@ process_execute (const char *file_name)
   return tid;
 }
 
+
+// use this to pass and push the arguments to the stack:
+static bool argument_passing(void **esp, char *file_name) {
+// push arguments to the stack;
+  size_t cmdLen = strlen(file_name);
+  char s[cmdLen];
+  strlcpy(s, file_name, cmdLen);
+
+  // keep checking this to ensure the arguments do not exceed a single page;
+  int bytes_used = 0;
+
+  char *token, *save_ptr;
+
+  int j = 0;
+  int argc = 0;
+  char *argArr[argc];
+
+  for (token = strtok_r (s, " ", &save_ptr); token != NULL;
+       token = strtok_r (NULL, " ", &save_ptr)) {
+    argArr[j] = token;
+    argc++;
+    j++;
+    bytes_used += strlen(token) + 1;
+    if (bytes_used > PGSIZE) {
+      return false;
+    }
+
+    // push the arguments to the stack;
+    *esp = *esp - (strlen(token) + 1);
+    memcpy(*esp, token, strlen(token) + 1);
+  }
+  // note that we have got the argc;
+
+  // Aligning the esp to a nearest multiple of 4 DID NOT IMPLEMENT#
+  void *addr = (void *) ROUND_DOWN ((uint8_t) *esp , 4);
+  int addr_diff = (int) *esp - (int) addr;
+  *esp = *esp - addr_diff;
+  memcpy(*esp, 0, (size_t) addr_diff);
+
+  //push sentinel to the stack
+  *esp = *esp - sizeof (char *);
+  memcpy (*esp, 0, sizeof (char *));
+
+  // push the address of arguments to the stack:
+  for (int i = argc; i > 0; i--) {
+    *esp = *esp - 1;
+    memcpy(*esp, &argArr[i], sizeof(char *));
+  }
+
+  // push address of the command name
+  void *t = *esp;
+  *esp = *esp - sizeof (char **);
+  memcpy (*esp, &t, sizeof (char **));
+
+  //push the argc to the stack:
+  *esp = *esp - sizeof (int);
+  memcpy (*esp, &argc, sizeof (int));
+
+  // push Return Address to the stack
+  *esp = *esp - sizeof (void *);
+  memcpy (*esp, 0, sizeof (void *));
+
+  return true;
+
+//
+}
+
 /* A thread function that loads a user process and starts it
-   running. */
+  running. */
 static void
 start_process (void *file_name_)
 {
@@ -60,6 +128,11 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
+
+  // if load succeeded we start passing the arguments to the stack:
+  if (success) {
+    success = argument_passing(&if_.esp, file_name);
+  }
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -88,6 +161,8 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  while (true) {};
+  
   return -1;
 }
 
@@ -114,6 +189,7 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+//  printf ("%s: exit(%d)\n", , );
 }
 
 /* Sets up the CPU for running user code in the current
@@ -195,26 +271,12 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack(void **esp, char **argArr, int argc);
+static bool setup_stack(void **esp);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
                           bool writable);
-int get_argc(const char *file_name);
 
-int get_argc(const char *file_name) {
-  size_t cmdLen = strlen(file_name);
-  char s[cmdLen];
-  strlcpy(s, file_name, cmdLen);
-  char *token, *save_ptr;
-  int argc = 0;
-
-  for (token = strtok_r (s, " ", &save_ptr); token != NULL;
-       token = strtok_r (NULL, " ", &save_ptr)) {
-    argc++;
-  }
-  return argc;
-}
 
 /* Loads an ELF executable from FILE_NAME into the current thread.
    Stores the executable's entry point into *EIP
@@ -224,24 +286,6 @@ int get_argc(const char *file_name) {
 bool
 load (const char *file_name, void (**eip) (void), void **esp)
 {
-//
-  size_t cmdLen = strlen(file_name);
-  char s[cmdLen];
-  strlcpy(s, file_name, cmdLen);
-
-  char *token, *save_ptr;
-  int j = 0;
-  int argc = get_argc(file_name);
-  char *argArr[argc];
-
-  for (token = strtok_r (s, " ", &save_ptr); token != NULL;
-       token = strtok_r (NULL, " ", &save_ptr)) {
-    argArr[j] = token;
-    j++;
-  }
-  argArr[j] = 0;
-//
-
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
@@ -336,7 +380,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack(esp, argArr, argc))
+  if (!setup_stack(esp))
     goto done;
 
   /* Start address. */
@@ -461,7 +505,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack(void **esp, char **argArr , int argc)
+setup_stack(void **esp)
 {
   uint8_t *kpage;
   bool success = false;
@@ -478,27 +522,28 @@ setup_stack(void **esp, char **argArr , int argc)
       }
     }
 
-    // push the arguments on the stack;
-    for (int i = argc - 1; i > 0; i--) {
-      *esp = *esp - sizeof(argArr[i]);
-      memcpy(*esp,  argArr[i], sizeof(&argArr[i]));
-    }
-    // push the word align on the stack;
-    uint8_t word_align = 0;
-    *esp = *esp - sizeof(uint8_t);
-    memcpy(*esp, &word_align, sizeof(uint8_t));
-
-    for (int i = argc; i > 0; i--) {
-      *esp = *esp - sizeof(char *);
-      memcpy(*esp, &argArr[i], sizeof(char *));
-    }
-
-    *esp = *esp - sizeof(int);
-    memcpy(*esp, &argc, sizeof(int));
-
-    *esp = *esp - sizeof(void *);
-    memcpy(*esp, argArr[argc], sizeof(void *));
-
+//    // push the arguments on the stack;
+//    for (int i = argc - 1; i > 0; i--) {
+//      *esp = *esp - 1;
+//      memcpy(*esp,  argArr[i], sizeof(&argArr[i]));
+//    }
+//    // push the word align on the stack;
+//    uint8_t word_align = 0;
+//    *esp = *esp - 1;
+//    memcpy(*esp, &word_align, sizeof(uint8_t));
+//
+//    for (int i = argc; i > 0; i--) {
+//      *esp = *esp - 1;
+//      memcpy(*esp, &argArr[i], sizeof(char *));
+//    }
+//
+//    *esp = *esp - 1;
+//    memcpy(*esp, &argc, sizeof(int));
+//
+//    *esp = *esp - 1;
+//    memcpy(*esp, argArr[argc], sizeof(void *));
+//
+//    hex_dump(PHYS_BASE - 48, *esp, 48, true);
 
   return success;
 }

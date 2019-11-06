@@ -203,6 +203,9 @@ lock_acquire(struct lock *lock) {
 
   enum intr_level old_level;
   old_level = intr_disable();
+
+  list_push_back(&thread_current()->locks, &lock->lockElem);
+
   if (!thread_mlfqs) {
     if (lock->holder != NULL) {
       if (lock->holder->status != THREAD_DYING)
@@ -287,6 +290,8 @@ lock_try_acquire(struct lock *lock) {
    handler. */
 void
 lock_release(struct lock *lock) {
+
+  list_remove(&lock->lockElem);
   int thisPrior =
       list_entry(list_max(&lock->semaphore.waiters, compare_priority,
                           NULL), struct thread, elem)->priority;

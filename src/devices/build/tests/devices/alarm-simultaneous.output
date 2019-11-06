@@ -1,0 +1,17 @@
+qemu-system-i386 -drive file=/tmp/ip9CixgoM5.dsk,index=0,media=disk,format=raw -m 4 -net none -nographic -monitor null --no-kvm
+PiLo hda1
+Loading........
+Kernel command line: -q run alarm-simultaneous
+Pintos booting with 3,968 kB RAM...
+367 pages available in kernel pool.
+367 pages available in user pool.
+Kernel PANIC at ../../threads/thread.c:310 in thread_current(): assertion `t->status == THREAD_RUNNING' failed.
+Call stack: 0xc0027dd0 0xc00209ca 0xc0022747 0xc0029722 0xc00297dc 0xc002614b 0xc00216d9 0xc0021848.
+The `backtrace' program can make call stacks useful.
+Read "Backtraces" in the "Debugging Tools" chapter
+of the Pintos documentation for more information.
+Timer: 0 ticks
+Thread: 0 idle ticks, 0 kernel ticks, 0 user ticks
+Console: 586 characters output
+Keyboard: 0 keys pressed
+Powering off...
