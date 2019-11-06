@@ -107,9 +107,14 @@ struct thread
     int currentPos;                     /* current position of array priorities;*/
     struct thread *donateTo;            /* A pointer to record the thread that this thread donate to*/
 
+
+
   // for BSD:
     int nice;
     fp recent_cpu;
+
+  // user prog;
+    struct list locks;
 
 
 #ifdef USERPROG
