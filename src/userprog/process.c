@@ -79,12 +79,15 @@ static bool argument_passing(void **esp, char *file_name) {
   }
   // note that we have got the argc;
 
-  // Aligning the esp to a nearest multiple of 4 DID NOT IMPLEMENT
+  // Aligning the esp to a nearest multiple of 4 DID NOT IMPLEMENT#
+  void *addr = (void *) ROUND_DOWN ((uint8_t) *esp , 4);
+  int addr_diff = (int) *esp - (int) addr;
+  *esp = *esp - addr_diff;
+  memcpy(*esp, 0, (size_t) addr_diff);
 
   //push sentinel to the stack
-  int zero = 0;
   *esp = *esp - sizeof (char *);
-  memcpy (*esp, &zero, sizeof (char *));
+  memcpy (*esp, 0, sizeof (char *));
 
   // push the address of arguments to the stack:
   for (int i = argc; i > 0; i--) {
