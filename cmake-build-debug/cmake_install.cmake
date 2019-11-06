@@ -1,4 +1,4 @@
-# Install script for directory: /homes/yg9418/Downloads/Pintos/pintos_47
+# Install script for directory: /homes/jy4917/pintos_47
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -45,5 +45,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/homes/yg9418/Downloads/Pintos/pintos_47/cmake-build-debug/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/homes/jy4917/pintos_47/cmake-build-debug/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

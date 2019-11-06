@@ -1,4 +1,4 @@
-/usr/lib/clion-2018.2.2/bin/cmake/linux/bin/cmake -DCMAKE_BUILD_TYPE=Debug -G "CodeBlocks - Unix Makefiles" /homes/yg9418/Downloads/Pintos/pintos_47
+/usr/lib/clion-2018.2.2/bin/cmake/linux/bin/cmake -DCMAKE_BUILD_TYPE=Debug -G "CodeBlocks - Unix Makefiles" /homes/jy4917/pintos_47
 -- Configuring done
 -- Generating done
--- Build files have been written to: /homes/yg9418/Downloads/Pintos/pintos_47/cmake-build-debug
+-- Build files have been written to: /homes/jy4917/pintos_47/cmake-build-debug
