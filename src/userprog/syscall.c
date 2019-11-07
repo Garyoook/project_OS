@@ -49,15 +49,68 @@ void release_all_locks(struct thread *t){
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  // for user access memory
-  if (!check_esp(f->esp)){
-    release_all_locks(thread_current());
-    pagedir_clear_page(f->esp, thread_current()->pagedir);
 
+  // for user access memory
+  struct thread *t = thread_current();
+  if (!check_esp(f->esp)){
+    release_all_locks(t);
+    pagedir_clear_page(f->esp, t->pagedir);
     exit(-1);
   }
   // ---------------------------------
-  printf ("system call!\n");
+
+  int syscall_num;
+  syscall_num = *(int *)f->esp;
+  f->esp += 1;
+
+  void *fst = f->esp++;
+  void *snd = f->esp++;
+  void *trd = f->esp++;
+  void *fot = f->esp++;
+
+
+  switch (syscall_num) {
+    case SYS_EXEC:
+      f->eax = (uint32_t) exec((char *)fst);
+      break;
+    case SYS_CLOSE:
+      close((int)fst);
+      break;
+    case SYS_CREATE:
+      f->eax = (uint32_t) create(fst, (unsigned int) snd);
+      break;
+    case SYS_EXIT:
+      exit(t->status);
+      break;
+    case SYS_FILESIZE:
+      f->eax = (uint32_t) filesize((int) fst);
+      break;
+    case SYS_HALT:
+      halt();
+    case SYS_OPEN:
+      f->eax = (uint32_t) open(fst);
+      break;
+    case SYS_READ:
+      f->eax = (uint32_t) read((int) fst, snd, (unsigned int) trd);
+      break;
+    case SYS_WRITE:
+      f->eax = (uint32_t) write((int) fst, snd, (unsigned int) trd);
+      break;
+    case SYS_WAIT:
+      f->eax = (uint32_t) wait((pid_t) fst);
+      break;
+    case SYS_REMOVE:
+      f->eax = (uint32_t) remove(fst);
+      break;
+    case SYS_SEEK:
+      seek((int) fst, (unsigned int) snd);
+      break;
+    case SYS_TELL:
+      f->eax = tell((int) fst);
+      break;
+    default:break;
+  }
+      printf ("system call!\n");
   thread_exit ();
 }
 
