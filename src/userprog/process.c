@@ -48,11 +48,11 @@ process_execute (const char *file_name)
 
 
 // use this to pass and push the arguments to the stack:
-static bool argument_passing(void **esp, char *file_name) {
+static bool argument_passing(void *esp, char *file_name) {
 // push arguments to the stack;
   size_t cmdLen = strlen(file_name);
   char s[cmdLen];
-  strlcpy(s, file_name, cmdLen);
+  strlcpy(s, file_name, (cmdLen + 1));
 
   // keep checking this to ensure the arguments do not exceed a single page;
   int bytes_used = 0;
@@ -65,6 +65,7 @@ static bool argument_passing(void **esp, char *file_name) {
 
   for (token = strtok_r (s, " ", &save_ptr); token != NULL;
        token = strtok_r (NULL, " ", &save_ptr)) {
+    printf("%s\n", token);
     argArr[j] = token;
     argc++;
     j++;
@@ -72,41 +73,53 @@ static bool argument_passing(void **esp, char *file_name) {
     if (bytes_used > PGSIZE) {
       return false;
     }
-
-    // push the arguments to the stack;
-    *esp = *esp - (strlen(token) + 1);
-    memcpy(*esp, token, strlen(token) + 1);
   }
+
+  // push the arguments to the stack;
+  for (int i = argc - 1; i >= 0; i--) {
+    esp = esp - (strlen(argArr[i]) + 1);
+    memcpy(esp, argArr[i], strlen(argArr[i]) + 1);
+  }
+
+
   // note that we have got the argc;
 
   // Aligning the esp to a nearest multiple of 4 DID NOT IMPLEMENT#
-  void *addr = (void *) ROUND_DOWN ((uint8_t) *esp , 4);
-  int addr_diff = (int) *esp - (int) addr;
-  *esp = *esp - addr_diff;
-  memcpy(*esp, 0, (size_t) addr_diff);
+  void *addr = (void *) ROUND_DOWN ((uint64_t) esp , 4);
+  size_t addr_diff = ((size_t)addr - (size_t)esp);
+  esp = addr;
+
+  uint8_t zero = 0;
+//  memcpy(esp, &zero, addr_diff);
+
 
   //push sentinel to the stack
-  *esp = *esp - sizeof (char *);
-  memcpy (*esp, 0, sizeof (char *));
+  enum intr_level old_level;
+
+  esp = esp - sizeof (char *);
+
+
+  memcpy (esp, &zero, sizeof (char *));
 
   // push the address of arguments to the stack:
   for (int i = argc; i > 0; i--) {
-    *esp = *esp - 1;
-    memcpy(*esp, &argArr[i], sizeof(char *));
+    esp = esp - 1;
+    memcpy(esp, &argArr[i], sizeof(char *));
   }
 
   // push address of the command name
-  void *t = *esp;
-  *esp = *esp - sizeof (char **);
-  memcpy (*esp, &t, sizeof (char **));
+  void *t = esp;
+  esp = esp - sizeof (char **);
+  memcpy (esp, &t, sizeof (char **));
 
   //push the argc to the stack:
-  *esp = *esp - sizeof (int);
-  memcpy (*esp, &argc, sizeof (int));
+  esp = esp - sizeof (int);
+  memcpy (esp, &argc, sizeof (int));
 
-  // push Return Address to the stack
-  *esp = *esp - sizeof (void *);
-  memcpy (*esp, 0, sizeof (void *));
+  esp = esp - sizeof (void *);
+  int zero1 = 0;
+  memcpy (esp, &zero1, sizeof (void *));
+
 
   return true;
 
@@ -131,7 +144,8 @@ start_process (void *file_name_)
 
   // if load succeeded we start passing the arguments to the stack:
   if (success) {
-    success = argument_passing(&if_.esp, file_name);
+    success = argument_passing(
+        if_.esp, file_name);
   }
 
   /* If load failed, quit. */
@@ -161,7 +175,7 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  while (true) {};
+  while (1);
   
   return -1;
 }
@@ -543,7 +557,6 @@ setup_stack(void **esp)
 //    *esp = *esp - 1;
 //    memcpy(*esp, argArr[argc], sizeof(void *));
 //
-//    hex_dump(PHYS_BASE - 48, *esp, 48, true);
 
   return success;
 }

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <syscall-nr.h>
 #include <user/syscall.h>
+#include <string.h>
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
 #include "threads/interrupt.h"
@@ -12,7 +13,8 @@
 #include "threads/synch.h"
 
 static void syscall_handler (struct intr_frame *);
-bool check_esp(void const *esp);
+
+void check_esp(void const *esp);
 void release_all_locks(struct thread *t);
 
 void
@@ -22,15 +24,14 @@ syscall_init (void)
 }
 
 // for user access memory
-bool check_esp(void const *esp) {
-  for (int i = 0; i < 4; i++){
-    if (!(is_user_vaddr(esp + i) &&
-    pagedir_get_page(thread_current()->pagedir, esp + i) &&
-    esp+i != NULL)) {
-      return false;
+void check_esp(void const *esp) {
+
+    if (!(is_user_vaddr(esp) &&
+    pagedir_get_page(thread_current()->pagedir, esp) &&
+    esp != NULL)) {
+       exit(-1);
     }
-  }
-  return true;
+
 }
 
 void release_all_locks(struct thread *t){
@@ -49,68 +50,85 @@ void release_all_locks(struct thread *t){
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-
   // for user access memory
   struct thread *t = thread_current();
-  if (!check_esp(f->esp)){
-    release_all_locks(t);
-    pagedir_clear_page(f->esp, t->pagedir);
-    exit(-1);
-  }
+  check_esp(f->esp);
+//    release_all_locks(t);
+ //   pagedir_clear_page(f->esp, t->pagedir);
+
   // ---------------------------------
 
   int syscall_num;
   syscall_num = *(int *)f->esp;
-  f->esp += 1;
+//  f->esp += 1;
 
-  void *fst = f->esp++;
-  void *snd = f->esp++;
-  void *trd = f->esp++;
-  void *fot = f->esp++;
+  void *fst = (int *)(f->esp) + 1;
+  void *snd = (int *)(f->esp) + 2;
+  void *trd = (int *)(f->esp) + 3;
 
+  printf("fst = %d| snd = %i| trd = %i|\n", *(int *)fst, *(int *)snd, *(int *)trd);
+
+  printf ("system call = %d\n", syscall_num);
 
   switch (syscall_num) {
     case SYS_EXEC:
+      check_esp(fst);
       f->eax = (uint32_t) exec((char *)fst);
       break;
     case SYS_CLOSE:
+      check_esp(fst);
       close((int)fst);
       break;
     case SYS_CREATE:
+      check_esp(fst);
+      check_esp(snd);
       f->eax = (uint32_t) create(fst, (unsigned int) snd);
       break;
     case SYS_EXIT:
       exit(t->status);
       break;
     case SYS_FILESIZE:
+      check_esp(fst);
       f->eax = (uint32_t) filesize((int) fst);
       break;
     case SYS_HALT:
       halt();
     case SYS_OPEN:
+      check_esp(fst);
       f->eax = (uint32_t) open(fst);
       break;
     case SYS_READ:
+      check_esp(fst);
+      check_esp(snd);
+      check_esp(trd);
       f->eax = (uint32_t) read((int) fst, snd, (unsigned int) trd);
       break;
     case SYS_WRITE:
-      f->eax = (uint32_t) write((int) fst, snd, (unsigned int) trd);
+      check_esp(fst);
+      check_esp(snd);
+      check_esp(trd);
+      f->eax = (uint32_t) write(*(int *)fst, (void *)*(int *)snd, *(unsigned *) trd);
       break;
     case SYS_WAIT:
+      check_esp(fst);
       f->eax = (uint32_t) wait((pid_t) fst);
       break;
     case SYS_REMOVE:
+      check_esp(fst);
       f->eax = (uint32_t) remove(fst);
       break;
     case SYS_SEEK:
+      check_esp(fst);
+      check_esp(snd);
       seek((int) fst, (unsigned int) snd);
       break;
     case SYS_TELL:
+      check_esp(fst);
       f->eax = tell((int) fst);
       break;
     default:break;
   }
-      printf ("system call!\n");
+  printf ("system call!\n");
   thread_exit ();
 }
 
@@ -122,7 +140,8 @@ halt(void) {
 void
 exit (int status) {
   printf("%s: exit(%d)\n", thread_current()->name, thread_current()->status);
-  process_exit();
+//  process_exit();
+  thread_exit();
 }
 
 pid_t
@@ -171,17 +190,19 @@ read(int fd, void *buffer, unsigned size) {
 int
 write(int fd, const void *buffer, unsigned size) {
 
+//  printf("** fd = %d, buffer = 0x%d, size = %u\n", fd, buffer, size);
   if (fd == 1) {
     putbuf(buffer, size);
-  }
-
-  int current = file_tell(fd);
-  if (current < file_length(fd)) {
-    return file_write_at(fd, buffer, size, current);
-  } else {
     return 0;
   }
 
+//  int current = file_tell(fd);
+//  if (current < file_length(fd)) {
+//    return file_write_at(fd, buffer, size, current);
+//  } else {
+//    return 0;
+//  }
+  return 0;
 }
 
 void
