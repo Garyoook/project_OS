@@ -65,14 +65,9 @@ static bool argument_passing(void *esp, char *file_name) {
 
   for (token = strtok_r (s, " ", &save_ptr); token != NULL;
        token = strtok_r (NULL, " ", &save_ptr)) {
-    printf("%s\n", token);
     argArr[j] = token;
     argc++;
     j++;
-    bytes_used += strlen(token) + 1;
-    if (bytes_used > PGSIZE) {
-      return false;
-    }
   }
 
   // push the arguments to the stack;
@@ -86,29 +81,27 @@ static bool argument_passing(void *esp, char *file_name) {
 
   // Aligning the esp to a nearest multiple of 4 DID NOT IMPLEMENT#
   void *addr = (void *) ROUND_DOWN ((uint64_t) esp , 4);
-  size_t addr_diff = ((size_t)addr - (size_t)esp);
+  size_t addr_diff = ((size_t)esp - (size_t)addr);
   esp = addr;
+  memset(esp, 0, addr_diff);
+  printf("\nsdadasdsad\n");
+  hex_dump(PHYS_BASE - 48, esp, 48, true);
 
-  uint8_t zero = 0;
-//  memcpy(esp, &zero, addr_diff);
 
 
   //push sentinel to the stack
-  enum intr_level old_level;
 
   esp = esp - sizeof (char *);
-
-
-  memcpy (esp, &zero, sizeof (char *));
+  memset (esp, 0, sizeof (char *));
 
   // push the address of arguments to the stack:
   for (int i = argc; i > 0; i--) {
-    esp = esp - 1;
+    esp = esp - sizeof(char *);
     memcpy(esp, &argArr[i], sizeof(char *));
   }
 
   // push address of the command name
-  void *t = esp;
+  void *t = argArr[0];
   esp = esp - sizeof (char **);
   memcpy (esp, &t, sizeof (char **));
 
@@ -117,8 +110,8 @@ static bool argument_passing(void *esp, char *file_name) {
   memcpy (esp, &argc, sizeof (int));
 
   esp = esp - sizeof (void *);
-  int zero1 = 0;
-  memcpy (esp, &zero1, sizeof (void *));
+  void *nullPtr;
+  memcpy (esp, &nullPtr, sizeof (void *));
 
 
   return true;
@@ -176,6 +169,8 @@ int
 process_wait (tid_t child_tid UNUSED) 
 {
   while (1);
+
+
   
   return -1;
 }
@@ -186,6 +181,7 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

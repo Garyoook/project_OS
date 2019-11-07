@@ -11,6 +11,7 @@
 #include "filesys/file.h"
 #include "pagedir.h"
 #include "threads/synch.h"
+#include "devices/input.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -155,6 +156,8 @@ wait(pid_t pid) {
   if (t->status == THREAD_DYING){
     return THREAD_DYING;
   }
+  return process_wait(pid);
+
 }
 
 bool
@@ -184,7 +187,13 @@ filesize(int fd) {
 
 int
 read(int fd, void *buffer, unsigned size) {
+  if (fd == 1) {
 
+  }
+
+  if (fd == 0) {
+    input_getc();
+  }
 }
 
 int
