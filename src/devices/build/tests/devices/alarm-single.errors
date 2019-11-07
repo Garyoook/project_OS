@@ -1,2 +1,0 @@
-Use of uninitialized value in numeric le (<=) at /vol/lab/secondyear/bin/pintos line 828.
-qemu-system-i386: terminating on signal 2
