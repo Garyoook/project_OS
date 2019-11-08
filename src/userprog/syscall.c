@@ -9,6 +9,7 @@
 #include "threads/thread.h"
 #include "process.h"
 #include "filesys/file.h"
+#include "filesys/filesys.h"
 #include "pagedir.h"
 #include "threads/synch.h"
 #include "devices/input.h"
@@ -17,6 +18,14 @@ static void syscall_handler (struct intr_frame *);
 
 void check_esp(void const *esp);
 void release_all_locks(struct thread *t);
+
+struct fileWithFd{
+    int fd;
+    struct file *f;
+};
+
+struct fileWithFd fileFdArray[128];
+int currentFd = 1;
 
 void
 syscall_init (void) 
@@ -172,7 +181,14 @@ remove(const char *file) {
 
 int
 open(const char *file) {
-
+  struct file *file1 = filesys_open(file);
+  if (currentFd<129) {
+    currentFd++;
+    struct fileWithFd *fwfd = (currentFd, file1);
+    fileFdArray[currentFd-2] = *fwfd;
+    // will use a size 130 array of file better than create a sturct for it?
+  }
+  return currentFd;
 }
 
 int
@@ -216,15 +232,17 @@ write(int fd, const void *buffer, unsigned size) {
 
 void
 seek(int fd, unsigned position) {
-
+  file_seek(fileFdArray[fd-2].f, position);
 }
 
 unsigned
 tell(int fd) {
-
+  return (unsigned int) file_tell(fileFdArray[fd - 2].f);
 }
 
 void
 close(int fd) {
-  
+  if (fd<129) {
+    file_close(fileFdArray[fd-2].f);
+  }
 }
