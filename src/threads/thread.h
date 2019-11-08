@@ -115,6 +115,9 @@ struct thread
 
   // user prog;
     struct list locks;
+    struct thread *parent;
+    struct list child_process;
+
 
 
 #ifdef USERPROG

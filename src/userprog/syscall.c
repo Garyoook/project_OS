@@ -76,9 +76,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   void *snd = (int *)(f->esp) + 2;
   void *trd = (int *)(f->esp) + 3;
 
-  printf("fst = %d| snd = %i| trd = %i|\n", *(int *)fst, *(int *)snd, *(int *)trd);
-
-  printf ("system call = %d\n", syscall_num);
+//  printf("fst = %d| snd = %i| trd = %i|\n", *(int *)fst, *(int *)snd, *(int *)trd);
 
   switch (syscall_num) {
     case SYS_EXEC:
@@ -111,13 +109,13 @@ syscall_handler (struct intr_frame *f UNUSED)
       check_esp(fst);
       check_esp(snd);
       check_esp(trd);
-      f->eax = (uint32_t) read((int) fst, snd, (unsigned int) trd);
+      f->eax = (uint32_t) read(*(int *)fst, (void *)*(int *)snd, *(unsigned *) trd);
       break;
     case SYS_WRITE:
       check_esp(fst);
       check_esp(snd);
       check_esp(trd);
-      f->eax = (uint32_t) write(*(int *)fst, (void *)*(int *)snd, *(unsigned *) trd);
+      f->eax = (uint32_t) write(*(int *)fst, *(void **)snd, *(unsigned *) trd);
       break;
     case SYS_WAIT:
       check_esp(fst);
@@ -138,8 +136,6 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
     default:break;
   }
-  printf ("system call!\n");
-  thread_exit ();
 }
 
 void
@@ -149,7 +145,9 @@ halt(void) {
 
 void
 exit (int status) {
+  struct thread *cur = thread_current();
   printf("%s: exit(%d)\n", thread_current()->name, thread_current()->status);
+//  thread_unblock(cur->parent);
 //  process_exit();
   thread_exit();
 }
@@ -161,12 +159,7 @@ exec(const char *cmd_line) {
 
 int
 wait(pid_t pid) {
-  struct thread *t = &pid;
-  if (t->status == THREAD_DYING){
-    return THREAD_DYING;
-  }
   return process_wait(pid);
-
 }
 
 bool
@@ -215,7 +208,8 @@ read(int fd, void *buffer, unsigned size) {
 int
 write(int fd, const void *buffer, unsigned size) {
 
-//  printf("** fd = %d, buffer = 0x%d, size = %u\n", fd, buffer, size);
+//  printf("** inwrite(), fd = %d, buffer = 0x%d, size = %u\n", fd, buffer, size);
+
   if (fd == 1) {
     putbuf(buffer, size);
     return 0;

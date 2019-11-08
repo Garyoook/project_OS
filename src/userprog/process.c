@@ -48,7 +48,7 @@ process_execute (const char *file_name)
 
 
 // use this to pass and push the arguments to the stack:
-static bool argument_passing(void *esp, char *file_name) {
+static bool argument_passing(void **esp, char *file_name) {
 // push arguments to the stack;
   size_t cmdLen = strlen(file_name);
   char s[cmdLen];
@@ -61,7 +61,9 @@ static bool argument_passing(void *esp, char *file_name) {
 
   int j = 0;
   int argc = 0;
-  char *argArr[argc];
+  char *argArr[4];
+  void *addrArr[4];
+  void *addr_argv;
 
   for (token = strtok_r (s, " ", &save_ptr); token != NULL;
        token = strtok_r (NULL, " ", &save_ptr)) {
@@ -72,47 +74,48 @@ static bool argument_passing(void *esp, char *file_name) {
 
   // push the arguments to the stack;
   for (int i = argc - 1; i >= 0; i--) {
-    esp = esp - (strlen(argArr[i]) + 1);
-    memcpy(esp, argArr[i], strlen(argArr[i]) + 1);
+    *esp = *esp - (strlen(argArr[i]) + 1);
+    memcpy((char *)*esp, argArr[i], strlen(argArr[i]) + 1);
+//    printf("address of arguments %x\n", (unsigned int) *esp);
+    addrArr[i] = *esp;
   }
+
 
 
   // note that we have got the argc;
 
   // Aligning the esp to a nearest multiple of 4 DID NOT IMPLEMENT#
-  void *addr = (void *) ROUND_DOWN ((uint64_t) esp , 4);
-  size_t addr_diff = ((size_t)esp - (size_t)addr);
-  esp = addr;
-  memset(esp, 0, addr_diff);
-  printf("\nsdadasdsad\n");
-  hex_dump(PHYS_BASE - 48, esp, 48, true);
-
-
+  void *addr = (void *) ROUND_DOWN ((uint64_t) *esp , 4);
+  size_t addr_diff = ((size_t)*esp - (size_t)addr);
+  *esp = addr;
+  memset(*esp, 0, addr_diff);
 
   //push sentinel to the stack
-
-  esp = esp - sizeof (char *);
-  memset (esp, 0, sizeof (char *));
+  *esp = *esp - sizeof (char *);
+  memset (*esp, 0, sizeof (char *));
 
   // push the address of arguments to the stack:
-  for (int i = argc; i > 0; i--) {
-    esp = esp - sizeof(char *);
-    memcpy(esp, &argArr[i], sizeof(char *));
+  for (int i = argc - 1; i >= 0; i--) {
+    *esp = *esp - sizeof(char *);
+    memcpy(*esp, &addrArr[i], sizeof(char *));
+//    printf("value stored: %x\n", (unsigned int) *&addrArr[i]);
   }
+  addr_argv = *esp;
+
 
   // push address of the command name
-  void *t = argArr[0];
-  esp = esp - sizeof (char **);
-  memcpy (esp, &t, sizeof (char **));
+  *esp = *esp - sizeof (char **);
+  memcpy(*esp, &addr_argv, sizeof(char **));
 
   //push the argc to the stack:
-  esp = esp - sizeof (int);
-  memcpy (esp, &argc, sizeof (int));
+  *esp = *esp - sizeof (int);
+  *(int *)*esp = argc;
 
-  esp = esp - sizeof (void *);
-  void *nullPtr;
-  memcpy (esp, &nullPtr, sizeof (void *));
+  *esp = *esp - sizeof (void *);
+  void *nullPtr = NULL;
+  memcpy (*esp, &nullPtr, sizeof (void *));
 
+//  hex_dump(PHYS_BASE - 48, *esp, 48, true);
 
   return true;
 
@@ -138,7 +141,7 @@ start_process (void *file_name_)
   // if load succeeded we start passing the arguments to the stack:
   if (success) {
     success = argument_passing(
-        if_.esp, file_name);
+        &if_.esp, file_name);
   }
 
   /* If load failed, quit. */
@@ -168,10 +171,15 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  while (1);
+//  struct thread *t = &child_tid;
 
+//  t->parent = thread_current();
+  enum intr_level old_level;
+  old_level = intr_disable();
 
-  
+  thread_block();
+
+  intr_set_level(old_level);
   return -1;
 }
 
@@ -181,6 +189,10 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+  if (cur->parent != NULL) {
+    thread_unblock(cur->parent);
+  }
 
 
   /* Destroy the current process's page directory and switch back
@@ -199,7 +211,6 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-//  printf ("%s: exit(%d)\n", , );
 }
 
 /* Sets up the CPU for running user code in the current
@@ -525,7 +536,7 @@ setup_stack(void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE - 12;
+        *esp = PHYS_BASE;
       else {
         palloc_free_page(kpage);
         return success;
