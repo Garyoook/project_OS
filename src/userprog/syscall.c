@@ -80,7 +80,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   switch (syscall_num) {
     case SYS_EXEC:
       check_esp(fst);
-      f->eax = (uint32_t) exec((char *)fst);
+      f->eax = (uint32_t) exec(*(char **)fst);
       break;
     case SYS_CLOSE:
       check_esp(fst);
@@ -97,7 +97,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
     case SYS_FILESIZE:
       check_esp(fst);
-      f->eax = (uint32_t) filesize((int) fst);
+      f->eax = (uint32_t) filesize(*(int *) fst);
       break;
     case SYS_HALT:
       halt();
@@ -110,7 +110,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       check_esp(fst);
       check_esp(snd);
       check_esp(trd);
-      f->eax = (uint32_t) read(*(int *)fst, (void *)*(int *)snd, *(unsigned *) trd);
+      f->eax = (uint32_t) read(*(int *)fst, *snd, *(unsigned *) trd);
       break;
     case SYS_WRITE:
       check_esp(fst);
@@ -120,7 +120,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
     case SYS_WAIT:
       check_esp(fst);
-      f->eax = (uint32_t) wait((pid_t) fst);
+      f->eax = (uint32_t) wait(*(pid_t *)fst);
       break;
     case SYS_REMOVE:
       check_esp(fst);
@@ -129,11 +129,11 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_SEEK:
       check_esp(fst);
       check_esp(snd);
-      seek((int) fst, (unsigned int) snd);
+      seek(*(int *) fst, *(unsigned int *) snd);
       break;
     case SYS_TELL:
       check_esp(fst);
-      f->eax = tell((int) fst);
+      f->eax = tell(*(int *) fst);
       break;
     default:break;
   }
@@ -191,6 +191,8 @@ open(const char *file) {
     currentFd++;
     fileFdArray[currentFd-2].fd = currentFd;
     fileFdArray[currentFd-2].f = file1;
+
+
     // will use a size 130 array of file better than create a sturct for it?
   } else {
     return -1;
@@ -200,22 +202,22 @@ open(const char *file) {
 
 int
 filesize(int fd) {
-  int bits=0;
-  while (fd>0) {
-    bits++;
-    fd /= 2;
-  }
-  return bits/8;
+  return file_length(fileFdArray[fd-2].f);
 }
 
 int
 read(int fd, void *buffer, unsigned size) {
-  if (fd == 1) {
-
+  check_esp(buffer);
+  if (fd == 0) {
+    return input_getc();
   }
 
-  if (fd == 0) {
-    input_getc();
+  struct file *currentFile = fileFdArray[fd-2].f;
+  if (currentFile != NULL) {
+    int current = file_tell(currentFile);
+    return file_read_at(currentFile, buffer, size, current);
+  } else {
+    exit(-1);
   }
 }
 
@@ -223,18 +225,23 @@ int
 write(int fd, const void *buffer, unsigned size) {
 
 //  printf("** inwrite(), fd = %d, buffer = 0x%d, size = %u\n", fd, buffer, size);
+  if (fd<1 || fd>130) {
+    exit(-1);
+  }
+
+  check_esp(buffer);
 
   if (fd == 1) {
+    // size may not bigger than hundred bytes
+    // otherwise may confused
     putbuf(buffer, size);
     return 0;
   }
 
-//  int current = file_tell(fd);
-//  if (current < file_length(fd)) {
-//    return file_write_at(fd, buffer, size, current);
-//  } else {
-//    return 0;
-//  }
+  struct file *currentFile = fileFdArray[fd-2].f;
+  int current = file_tell(currentFile);
+  return file_write_at(currentFile, buffer, size, current);
+
 }
 
 void
