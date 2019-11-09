@@ -108,8 +108,8 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_HALT:
       halt();
     case SYS_OPEN:
-//      check_esp(fst);
-//      check_esp(*(char **)fst);
+      check_esp(fst);
+      check_esp(*(char **)fst);
       f->eax = (uint32_t) open(*(char **)fst);
       break;
     case SYS_READ:
