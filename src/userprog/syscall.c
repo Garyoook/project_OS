@@ -43,6 +43,10 @@ void check_esp(void const *esp) {
 
 }
 
+bool ptr_invalid(const void *ptr) {
+  return (!is_user_vaddr(ptr) || ptr == NULL);
+}
+
 void release_all_locks(struct thread *t){
   struct list_elem *e,*next;
   e = list_begin (&t->locks);
@@ -57,11 +61,13 @@ void release_all_locks(struct thread *t){
 // ---------------------------------
 
 static void
-syscall_handler (struct intr_frame *f UNUSED) 
+syscall_handler (struct intr_frame *f UNUSED)
 {
-  // for user access memory
-  struct thread *t = thread_current();
+  // check esp is valid:
   check_esp(f->esp);
+
+  // for user access memory:
+  struct thread *t = thread_current();
 //    release_all_locks(t);
 //  pagedir_clear_page(f->esp, t->pagedir);
 
@@ -69,7 +75,6 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   int syscall_num;
   syscall_num = *(int *)f->esp;
-//  f->esp += 1;
 
   void **fst = (void **)(f->esp) + 1;
   void **snd = (void **)(f->esp) + 2;
@@ -78,65 +83,65 @@ syscall_handler (struct intr_frame *f UNUSED)
   switch (syscall_num) {
 
     case SYS_EXEC:
-      check_esp(fst);
-      check_esp(*(char **)fst);
+//      check_esp(fst);
+//      check_esp(*(char **)fst);
       f->eax = (uint32_t) exec(*(char **)fst);
       break;
     case SYS_CLOSE:
-      check_esp(fst);
+//      check_esp(fst);
       close((int)fst);
       break;
     case SYS_CREATE:
-      check_esp(fst);
-      check_esp(*(char **)fst);
-      check_esp(snd);
+//      check_esp(fst);
+//      check_esp(*(char **)fst);
+//      check_esp(snd);
       f->eax = (uint32_t) create(*(char **)fst, (void *)*(int *)snd);
       break;
     case SYS_EXIT:
-      check_esp(fst);
+      check_esp(fst);//must check it here to pass sc-bad-arg
       exit(*(int*)fst);
       break;
     case SYS_FILESIZE:
-      check_esp(fst);
+//      check_esp(fst);
       f->eax = (uint32_t) filesize(*(int *) fst);
       break;
     case SYS_HALT:
       halt();
     case SYS_OPEN:
-      check_esp(fst);
-      check_esp(*(char **)fst);
+//      check_esp(fst);
+//      check_esp(*(char **)fst);
       f->eax = (uint32_t) open(*(char **)fst);
       break;
     case SYS_READ:
-      check_esp(fst);
-      check_esp(snd);
-      check_esp(*snd);
-      check_esp(trd);
+//      check_esp(fst);
+//      check_esp(snd);
+//      check_esp(*snd);
+//      check_esp(trd);
       f->eax = (uint32_t) read(*(int *)fst, *snd, *(unsigned *) trd);
       break;
     case SYS_WRITE:
-      check_esp(fst);
-      check_esp(snd);
-      check_esp(*snd);
-      check_esp(trd);
+//      check_esp(fst);
+//      check_esp(snd);
+//      check_esp(*snd);
+//      check_esp(trd);
       f->eax = (uint32_t) write(*(int *)fst, *snd, *(unsigned *) trd);
       break;
     case SYS_WAIT:
-      check_esp(fst);
+//      check_esp(fst);
       f->eax = (uint32_t) wait(*(pid_t *)fst);
       break;
     case SYS_REMOVE:
-      check_esp(fst);
+//      check_esp(fst);
       check_esp(*(char **)fst);
       f->eax = (uint32_t) remove(*(const char **) fst);
       break;
     case SYS_SEEK:
-      check_esp(fst);
-      check_esp(snd);
+//      check_esp(fst);
+//      check_esp(snd);
       seek(*(int *) fst, *(unsigned int *) snd);
       break;
     case SYS_TELL:
-      check_esp(fst);
+//      check_esp(fst);
       f->eax = tell(*(int *) fst);
       break;
     default:break;
@@ -159,14 +164,15 @@ exit (int status) {
 
 pid_t
 exec(const char *cmd_line) {
-  // printf(NULL)
-  tid_t tid = process_execute(cmd_line);
+  pid_t pid = process_execute(cmd_line);
 
-  if (tid == TID_ERROR) {
-    return -1;
+  if (pid == TID_ERROR) {
+    pid = -1;
   }
-
-  return process_execute(cmd_line);
+//  printf("PPPPPPPPPPPPPPPIIIIIIIIIIIIIIIDDDDDDDDDDD:::%d\n",  (int)pid);
+  return pid;
+//  list_push_back(&thread_current()->child_process, &thread_current()->child_elem);
+//  return process_execute(cmd_line);
 }
 
 int

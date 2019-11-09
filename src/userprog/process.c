@@ -566,28 +566,6 @@ setup_stack(void **esp)
       }
     }
 
-//    // push the arguments on the stack;
-//    for (int i = argc - 1; i > 0; i--) {
-//      *esp = *esp - 1;
-//      memcpy(*esp,  argArr[i], sizeof(&argArr[i]));
-//    }
-//    // push the word align on the stack;
-//    uint8_t word_align = 0;
-//    *esp = *esp - 1;
-//    memcpy(*esp, &word_align, sizeof(uint8_t));
-//
-//    for (int i = argc; i > 0; i--) {
-//      *esp = *esp - 1;
-//      memcpy(*esp, &argArr[i], sizeof(char *));
-//    }
-//
-//    *esp = *esp - 1;
-//    memcpy(*esp, &argc, sizeof(int));
-//
-//    *esp = *esp - 1;
-//    memcpy(*esp, argArr[argc], sizeof(void *));
-//
-
   return success;
 }
 
