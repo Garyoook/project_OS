@@ -200,12 +200,7 @@ open(const char *file) {
 
 int
 filesize(int fd) {
-  int bits=0;
-  while (fd>0) {
-    bits++;
-    fd /= 2;
-  }
-  return bits/8;
+  return file_length(fileFdArray[fd-2].f);
 }
 
 int
@@ -222,19 +217,22 @@ read(int fd, void *buffer, unsigned size) {
 int
 write(int fd, const void *buffer, unsigned size) {
 
-//  printf("** inwrite(), fd = %d, buffer = 0x%d, size = %u\n", fd, buffer, size);
+  if (fd<1 || fd>130) {
+    exit(-1);
+  }
+
+  check_esp(buffer);
 
   if (fd == 1) {
+    // size may not bigger than hundred bytes
+    // otherwise may confused
     putbuf(buffer, size);
     return 0;
   }
 
-//  int current = file_tell(fd);
-//  if (current < file_length(fd)) {
-//    return file_write_at(fd, buffer, size, current);
-//  } else {
-//    return 0;
-//  }
+  struct file *currentFile = fileFdArray[fd-2].f;
+  int current = file_tell(currentFile);
+  return file_write_at(currentFile, buffer, size, current);
 }
 
 void
