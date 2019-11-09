@@ -191,8 +191,6 @@ open(const char *file) {
     currentFd++;
     fileFdArray[currentFd-2].fd = currentFd;
     fileFdArray[currentFd-2].f = file1;
-
-
     // will use a size 130 array of file better than create a sturct for it?
   } else {
     return -1;
