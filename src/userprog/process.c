@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "userprog/syscall.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -117,8 +118,6 @@ static bool argument_passing(void **esp, char *file_name) {
   *esp = *esp - sizeof (void *);
   void *nullPtr = NULL;
   memcpy (*esp, &nullPtr, sizeof (void *));
-
-//  hex_dump(PHYS_BASE - 48, *esp, 48, true);
 
   return true;
 

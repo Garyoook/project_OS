@@ -36,9 +36,9 @@ syscall_init (void)
 // for user access memory
 void check_esp(void const *esp) {
     if (!(is_user_vaddr(esp) &&
-    pagedir_get_page(thread_current()->pagedir, esp) &&
+        (pagedir_get_page(thread_current()->pagedir, esp) != NULL) &&
     esp != NULL)) {
-       exit(-1);
+      exit(-1);
     }
 
 }
@@ -63,7 +63,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   struct thread *t = thread_current();
   check_esp(f->esp);
 //    release_all_locks(t);
- //   pagedir_clear_page(f->esp, t->pagedir);
+//  pagedir_clear_page(f->esp, t->pagedir);
 
   // ---------------------------------
 
@@ -75,11 +75,16 @@ syscall_handler (struct intr_frame *f UNUSED)
   void **snd = (void **)(f->esp) + 2;
   void **trd = (void **)(f->esp) + 3;
 
-//  printf("fst = %d| snd = %i| trd = %i|\n", *(int *)fst, *(int *)snd, *(int *)trd);
+
+
+
+  if (fst == NULL) printf("HHHHHHHHHHHHHHHHHHHHHHHHHHHH\n");
 
   switch (syscall_num) {
+
     case SYS_EXEC:
       check_esp(fst);
+      check_esp(*(char **)fst);
       f->eax = (uint32_t) exec(*(char **)fst);
       break;
     case SYS_CLOSE:
@@ -88,11 +93,12 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
     case SYS_CREATE:
       check_esp(fst);
-      check_esp(*(const char **)fst);
+      check_esp(*(char **)fst);
       check_esp(snd);
       f->eax = (uint32_t) create(*(char **)fst, (void *)*(int *)snd);
       break;
     case SYS_EXIT:
+      check_esp(fst);
       exit(*(int*)fst);
       break;
     case SYS_FILESIZE:
@@ -103,20 +109,22 @@ syscall_handler (struct intr_frame *f UNUSED)
       halt();
     case SYS_OPEN:
       check_esp(fst);
-      check_esp(*fst);
+      check_esp(*(char **)fst);
       f->eax = (uint32_t) open(*(char **)fst);
       break;
     case SYS_READ:
       check_esp(fst);
       check_esp(snd);
+      check_esp(*snd);
       check_esp(trd);
       f->eax = (uint32_t) read(*(int *)fst, *snd, *(unsigned *) trd);
       break;
     case SYS_WRITE:
       check_esp(fst);
       check_esp(snd);
+      check_esp(*snd);
       check_esp(trd);
-      f->eax = (uint32_t) write(*(int *)fst, *(void **)snd, *(unsigned *) trd);
+      f->eax = (uint32_t) write(*(int *)fst, *snd, *(unsigned *) trd);
       break;
     case SYS_WAIT:
       check_esp(fst);
@@ -124,7 +132,8 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
     case SYS_REMOVE:
       check_esp(fst);
-      f->eax = (uint32_t) remove(fst);
+      check_esp(*(char **)fst);
+      f->eax = (uint32_t) remove(*(const char **) fst);
       break;
     case SYS_SEEK:
       check_esp(fst);
@@ -141,6 +150,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 
 void
 halt(void) {
+  // printf(NULL)
   shutdown_power_off();
 }
 
@@ -148,11 +158,13 @@ void
 exit (int status) {
   struct thread *cur = thread_current();
   printf("%s: exit(%d)\n", cur->name, status);
+
   thread_exit();
 }
 
 pid_t
 exec(const char *cmd_line) {
+  // printf(NULL)
   tid_t tid = process_execute(cmd_line);
 
   if (tid == TID_ERROR) {
@@ -164,11 +176,13 @@ exec(const char *cmd_line) {
 
 int
 wait(pid_t pid) {
+  // printf(NULL)
   return process_wait(pid);
 }
 
 bool
 create(const char *file, unsigned initial_size) {
+  // printf(NULL)
   if (strnlen(file, 15) > 14) {
     return false;
   }
@@ -181,11 +195,13 @@ create(const char *file, unsigned initial_size) {
 
 bool
 remove(const char *file) {
+  // printf(NULL)
   return filesys_remove(file);
 }
 
 int
 open(const char *file) {
+  // printf(NULL)
   struct file *file1 = filesys_open(file);
 
   if (strlen(file) == 0 || file1 == NULL) {
@@ -205,11 +221,16 @@ open(const char *file) {
 
 int
 filesize(int fd) {
+  // printf(NULL)
   return file_length(fileFdArray[fd-2].f);
 }
 
 int
 read(int fd, void *buffer, unsigned size) {
+  printf(NULL);
+  if (fd<1 || fd>130) {
+    exit(-1);
+  }
   check_esp(buffer);
   if (fd == 0) {
     return input_getc();
@@ -226,14 +247,10 @@ read(int fd, void *buffer, unsigned size) {
 
 int
 write(int fd, const void *buffer, unsigned size) {
-
-//  printf("** inwrite(), fd = %d, buffer = 0x%d, size = %u\n", fd, buffer, size);
   if (fd<1 || fd>130) {
     exit(-1);
   }
-
   check_esp(buffer);
-
   if (fd == 1) {
     // size may not bigger than hundred bytes
     // otherwise may confused
@@ -249,16 +266,19 @@ write(int fd, const void *buffer, unsigned size) {
 
 void
 seek(int fd, unsigned position) {
+  // printf(NULL)
   file_seek(fileFdArray[fd-2].f, position);
 }
 
 unsigned
 tell(int fd) {
+  // printf(NULL)
   return (unsigned int) file_tell(fileFdArray[fd - 2].f);
 }
 
 void
 close(int fd) {
+  // printf(NULL)
   if (fd<129) {
     file_close(fileFdArray[fd-2].f);
   }
