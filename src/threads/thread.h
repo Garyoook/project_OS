@@ -116,7 +116,8 @@ struct thread
   // user prog;
     struct list locks;
     struct thread *parent;
-    struct list child_process;
+    struct list child_list;
+    struct list_elem child_elem;
 
 
 

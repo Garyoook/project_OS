@@ -25,7 +25,7 @@ struct fileWithFd{
 };
 
 struct fileWithFd fileFdArray[128];
-int currentFd = 1;
+int currentFd = 2;
 
 void
 syscall_init (void) 
@@ -35,7 +35,6 @@ syscall_init (void)
 
 // for user access memory
 void check_esp(void const *esp) {
-
     if (!(is_user_vaddr(esp) &&
     pagedir_get_page(thread_current()->pagedir, esp) &&
     esp != NULL)) {
@@ -72,9 +71,9 @@ syscall_handler (struct intr_frame *f UNUSED)
   syscall_num = *(int *)f->esp;
 //  f->esp += 1;
 
-  void *fst = (int *)(f->esp) + 1;
-  void *snd = (int *)(f->esp) + 2;
-  void *trd = (int *)(f->esp) + 3;
+  void **fst = (void **)(f->esp) + 1;
+  void **snd = (void **)(f->esp) + 2;
+  void **trd = (void **)(f->esp) + 3;
 
 //  printf("fst = %d| snd = %i| trd = %i|\n", *(int *)fst, *(int *)snd, *(int *)trd);
 
@@ -89,11 +88,12 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
     case SYS_CREATE:
       check_esp(fst);
+      check_esp(*(const char **)fst);
       check_esp(snd);
-      f->eax = (uint32_t) create(fst, (unsigned int) snd);
+      f->eax = (uint32_t) create(*(char **)fst, (void *)*(int *)snd);
       break;
     case SYS_EXIT:
-      exit(t->status);
+      exit(*(int*)fst);
       break;
     case SYS_FILESIZE:
       check_esp(fst);
@@ -103,7 +103,8 @@ syscall_handler (struct intr_frame *f UNUSED)
       halt();
     case SYS_OPEN:
       check_esp(fst);
-      f->eax = (uint32_t) open(fst);
+      check_esp(*fst);
+      f->eax = (uint32_t) open(*(char **)fst);
       break;
     case SYS_READ:
       check_esp(fst);
@@ -146,15 +147,14 @@ halt(void) {
 void
 exit (int status) {
   struct thread *cur = thread_current();
-  printf("%s: exit(%d)\n", thread_current()->name, thread_current()->status);
-//  thread_unblock(cur->parent);
-//  process_exit();
+  printf("%s: exit(%d)\n", cur->name, status);
   thread_exit();
 }
 
 pid_t
 exec(const char *cmd_line) {
-
+  struct thread *child_process;
+  return 0;
 }
 
 int
@@ -164,22 +164,36 @@ wait(pid_t pid) {
 
 bool
 create(const char *file, unsigned initial_size) {
-
+  if (strnlen(file, 15) > 14) {
+    return false;
+  }
+  if (initial_size >= 0 && *file != '\0') {
+    return filesys_create(file, initial_size);
+  } else {
+    exit(-1);
+  }
 }
 
 bool
 remove(const char *file) {
-
+  return filesys_remove(file);
 }
 
 int
 open(const char *file) {
   struct file *file1 = filesys_open(file);
+
+  if (strlen(file) == 0 || file1 == NULL) {
+    return -1;
+  }
+
   if (currentFd<129) {
     currentFd++;
-    struct fileWithFd *fwfd = (currentFd, file1);
-    fileFdArray[currentFd-2] = *fwfd;
+    fileFdArray[currentFd-2].fd = currentFd;
+    fileFdArray[currentFd-2].f = file1;
     // will use a size 130 array of file better than create a sturct for it?
+  } else {
+    return -1;
   }
   return currentFd;
 }
@@ -221,7 +235,6 @@ write(int fd, const void *buffer, unsigned size) {
 //  } else {
 //    return 0;
 //  }
-  return 0;
 }
 
 void

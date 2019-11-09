@@ -40,12 +40,16 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  char *command_name, *save_ptr;
+  command_name = strtok_r((char *) file_name, " ", &save_ptr);
+  tid = thread_create (command_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
 }
 
+
+static int get_argc(char *name);
 
 // use this to pass and push the arguments to the stack:
 static bool argument_passing(void **esp, char *file_name) {
@@ -60,15 +64,14 @@ static bool argument_passing(void **esp, char *file_name) {
   char *token, *save_ptr;
 
   int j = 0;
-  int argc = 0;
-  char *argArr[4];
-  void *addrArr[4];
+  int argc = get_argc(file_name);
+  char *argArr[argc];
+  void *addrArr[argc];
   void *addr_argv;
 
   for (token = strtok_r (s, " ", &save_ptr); token != NULL;
        token = strtok_r (NULL, " ", &save_ptr)) {
     argArr[j] = token;
-    argc++;
     j++;
   }
 
@@ -122,6 +125,8 @@ static bool argument_passing(void **esp, char *file_name) {
 //
 }
 
+
+
 /* A thread function that loads a user process and starts it
   running. */
 static void
@@ -136,7 +141,14 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+
+  size_t cmdLen = strlen(file_name);
+  char s[cmdLen];
+  strlcpy(s, file_name, (cmdLen + 1));
+
+  char *command_name, *save_ptr;
+  command_name = strtok_r((char *) s, " ", &save_ptr);
+  success = load (command_name, &if_.eip, &if_.esp);
 
   // if load succeeded we start passing the arguments to the stack:
   if (success) {
@@ -462,6 +474,19 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
 
   /* It's okay. */
   return true;
+}
+
+static int get_argc(char *name) {
+  int argc = 0;
+  char *token, *save_ptr;
+  size_t cmdLen = strlen(name);
+  char s[cmdLen];
+  strlcpy(s, name, (cmdLen + 1));
+  for (token = strtok_r (s, " ", &save_ptr); token != NULL;
+       token = strtok_r (NULL, " ", &save_ptr)) {
+    argc++;
+  }
+  return argc;
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
