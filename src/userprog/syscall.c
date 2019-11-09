@@ -36,7 +36,7 @@ syscall_init (void)
 // for user access memory
 void check_esp(void const *esp) {
     if (!(is_user_vaddr(esp) &&
-        (pagedir_get_page(thread_current()->pagedir, esp) != NULL) &&
+    pagedir_get_page(thread_current()->pagedir, esp) &&
     esp != NULL)) {
       exit(-1);
     }
@@ -74,11 +74,6 @@ syscall_handler (struct intr_frame *f UNUSED)
   void **fst = (void **)(f->esp) + 1;
   void **snd = (void **)(f->esp) + 2;
   void **trd = (void **)(f->esp) + 3;
-
-
-
-
-  if (fst == NULL) printf("HHHHHHHHHHHHHHHHHHHHHHHHHHHH\n");
 
   switch (syscall_num) {
 
@@ -227,7 +222,7 @@ filesize(int fd) {
 
 int
 read(int fd, void *buffer, unsigned size) {
-  printf(NULL);
+  // printf(NULL)
   if (fd<1 || fd>130) {
     exit(-1);
   }
