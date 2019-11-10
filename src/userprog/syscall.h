@@ -18,6 +18,6 @@ int write (int fd, const void *buffer, unsigned size);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
-void check_esp(void const *esp);
+bool check_esp(void const *esp);
 
 #endif /* userprog/syscall.h */

@@ -16,7 +16,7 @@
 
 static void syscall_handler (struct intr_frame *);
 
-void check_esp(void const *esp);
+bool safe_access(void const *esp);
 void release_all_locks(struct thread *t);
 
 struct fileWithFd{
@@ -34,12 +34,10 @@ syscall_init (void)
 }
 
 // for user access memory
-void check_esp(void const *esp) {
-    if (!(is_user_vaddr(esp) &&
+bool safe_access(void const *esp) {
+  return (is_user_vaddr(esp) &&
     pagedir_get_page(thread_current()->pagedir, esp) &&
-    esp != NULL)) {
-      exit(-1);
-    }
+    esp != NULL);
 
 }
 
@@ -64,7 +62,7 @@ static void
 syscall_handler (struct intr_frame *f UNUSED)
 {
   // check esp is valid:
-  check_esp(f->esp);
+  if (!safe_access(f->esp)) exit(-1);
 
   // for user access memory:
   struct thread *t = thread_current();
@@ -98,7 +96,8 @@ syscall_handler (struct intr_frame *f UNUSED)
       f->eax = (uint32_t) create(*(char **)fst, (void *)*(int *)snd);
       break;
     case SYS_EXIT:
-      check_esp(fst);//must check it here to pass sc-bad-arg
+
+      if (!safe_access(fst)) exit(-1);//must check it here to pass sc-bad-arg
       exit(*(int*)fst);
       break;
     case SYS_FILESIZE:
@@ -108,8 +107,8 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_HALT:
       halt();
     case SYS_OPEN:
-      check_esp(fst);
-      check_esp(*(char **)fst);
+      if (!safe_access(fst)) exit(-1);
+      if (!safe_access(*(char **)fst)) exit(-1);
       f->eax = (uint32_t) open(*(char **)fst);
       break;
     case SYS_READ:
@@ -132,7 +131,8 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
     case SYS_REMOVE:
 //      check_esp(fst);
-      check_esp(*(char **)fst);
+      if (!safe_access(*(char **)fst)) exit(-1);
+
       f->eax = (uint32_t) remove(*(const char **) fst);
       break;
     case SYS_SEEK:
@@ -232,7 +232,7 @@ read(int fd, void *buffer, unsigned size) {
   if (fd<1 || fd>130) {
     exit(-1);
   }
-  check_esp(buffer);
+  if (!safe_access(buffer)) exit(-1);
   if (fd == 0) {
     return input_getc();
   }
@@ -251,7 +251,7 @@ write(int fd, const void *buffer, unsigned size) {
   if (fd<1 || fd>130) {
     exit(-1);
   }
-  check_esp(buffer);
+  if (!safe_access(buffer)) exit(-1);
   if (fd == 1) {
     // size may not bigger than hundred bytes
     // otherwise may confused

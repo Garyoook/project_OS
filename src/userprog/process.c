@@ -41,7 +41,11 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   char *command_name, *save_ptr;
+
   command_name = strtok_r((char *) file_name, " ", &save_ptr);
+//  printf("%saaaaaa\n", command_name);
+//  printf("%saaaaaaaaaa\n", file_name);
+
   tid = thread_create (command_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
@@ -146,6 +150,7 @@ start_process (void *file_name_)
 
   char *command_name, *save_ptr;
   command_name = strtok_r((char *) s, " ", &save_ptr);
+
   success = load (command_name, &if_.eip, &if_.esp);
 
   // if load succeeded we start passing the arguments to the stack:
