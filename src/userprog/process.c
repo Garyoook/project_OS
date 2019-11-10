@@ -47,10 +47,8 @@ process_execute (const char *file_name)
   strlcpy(command_name, strtok_r((char *) file_name_copy, " ", &save_ptr), 200);
 
   tid = thread_create (command_name, PRI_DEFAULT, start_process, fn_copy);
-
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy);
-
+    palloc_free_page (fn_copy); 
   return tid;
 }
 
@@ -154,6 +152,7 @@ start_process (void *file_name_)
 
   char *command_name, *save_ptr;
   command_name = strtok_r((char *) s, " ", &save_ptr);
+
   success = load (command_name, &if_.eip, &if_.esp);
 
   // if load succeeded we start passing the arguments to the stack:
@@ -573,28 +572,6 @@ setup_stack(void **esp)
         return success;
       }
     }
-
-//    // push the arguments on the stack;
-//    for (int i = argc - 1; i > 0; i--) {
-//      *esp = *esp - 1;
-//      memcpy(*esp,  argArr[i], sizeof(&argArr[i]));
-//    }
-//    // push the word align on the stack;
-//    uint8_t word_align = 0;
-//    *esp = *esp - 1;
-//    memcpy(*esp, &word_align, sizeof(uint8_t));
-//
-//    for (int i = argc; i > 0; i--) {
-//      *esp = *esp - 1;
-//      memcpy(*esp, &argArr[i], sizeof(char *));
-//    }
-//
-//    *esp = *esp - 1;
-//    memcpy(*esp, &argc, sizeof(int));
-//
-//    *esp = *esp - 1;
-//    memcpy(*esp, argArr[argc], sizeof(void *));
-//
 
   return success;
 }

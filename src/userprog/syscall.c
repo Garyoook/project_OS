@@ -16,7 +16,7 @@
 
 static void syscall_handler (struct intr_frame *);
 
-void check_esp(void const *esp);
+bool safe_access(void const *esp);
 void release_all_locks(struct thread *t);
 
 struct fileWithFd{
@@ -34,13 +34,15 @@ syscall_init (void)
 }
 
 // for user access memory
-void check_esp(void const *esp) {
-    if (!(is_user_vaddr(esp) &&
+bool safe_access(void const *esp) {
+  return (is_user_vaddr(esp) &&
     pagedir_get_page(thread_current()->pagedir, esp) &&
-    esp != NULL)) {
-       exit(-1);
-    }
+    esp != NULL);
 
+}
+
+bool ptr_invalid(const void *ptr) {
+  return (!is_user_vaddr(ptr) || ptr == NULL);
 }
 
 void release_all_locks(struct thread *t){
@@ -57,82 +59,89 @@ void release_all_locks(struct thread *t){
 // ---------------------------------
 
 static void
-syscall_handler (struct intr_frame *f UNUSED) 
+syscall_handler (struct intr_frame *f UNUSED)
 {
-  // for user access memory
+  // check esp is valid:
+  if (!safe_access(f->esp)) exit(-1);
+
+  // for user access memory:
   struct thread *t = thread_current();
-  check_esp(f->esp);
 //    release_all_locks(t);
- //   pagedir_clear_page(f->esp, t->pagedir);
+//  pagedir_clear_page(f->esp, t->pagedir);
 
   // ---------------------------------
 
   int syscall_num;
   syscall_num = *(int *)f->esp;
-//  f->esp += 1;
 
   void **fst = (void **)(f->esp) + 1;
   void **snd = (void **)(f->esp) + 2;
   void **trd = (void **)(f->esp) + 3;
 
-//  printf("fst = %d| snd = %i| trd = %i|\n", *(int *)fst, *(int *)snd, *(int *)trd);
-
   switch (syscall_num) {
+
     case SYS_EXEC:
-      check_esp(fst);
+//      check_esp(fst);
+//      check_esp(*(char **)fst);
       f->eax = (uint32_t) exec(*(char **)fst);
       break;
     case SYS_CLOSE:
-      check_esp(fst);
+//      check_esp(fst);
       close((int)fst);
       break;
     case SYS_CREATE:
-      check_esp(fst);
-      check_esp(*(const char **)fst);
-      check_esp(snd);
+//      check_esp(fst);
+//      check_esp(*(char **)fst);
+//      check_esp(snd);
       f->eax = (uint32_t) create(*(char **)fst, (void *)*(int *)snd);
       break;
     case SYS_EXIT:
+
+      if (!safe_access(fst)) exit(-1);//must check it here to pass sc-bad-arg
       exit(*(int*)fst);
       break;
     case SYS_FILESIZE:
-      check_esp(fst);
+//      check_esp(fst);
       f->eax = (uint32_t) filesize(*(int *) fst);
       break;
     case SYS_HALT:
       halt();
     case SYS_OPEN:
-      check_esp(fst);
-      check_esp(*fst);
+      if (!safe_access(fst)) exit(-1);
+      if (!safe_access(*(char **)fst)) exit(-1);
       f->eax = (uint32_t) open(*(char **)fst);
       break;
     case SYS_READ:
-      check_esp(fst);
-      check_esp(snd);
-      check_esp(trd);
+//      check_esp(fst);
+//      check_esp(snd);
+//      check_esp(*snd);
+//      check_esp(trd);
       f->eax = (uint32_t) read(*(int *)fst, *snd, *(unsigned *) trd);
       break;
     case SYS_WRITE:
-      check_esp(fst);
-      check_esp(snd);
-      check_esp(trd);
-      f->eax = (uint32_t) write(*(int *)fst, *(void **)snd, *(unsigned *) trd);
+//      check_esp(fst);
+//      check_esp(snd);
+//      check_esp(*snd);
+//      check_esp(trd);
+      f->eax = (uint32_t) write(*(int *)fst, *snd, *(unsigned *) trd);
       break;
     case SYS_WAIT:
-      check_esp(fst);
+//      check_esp(fst);
       f->eax = (uint32_t) wait(*(pid_t *)fst);
       break;
     case SYS_REMOVE:
-      check_esp(fst);
-      f->eax = (uint32_t) remove(fst);
+//      check_esp(fst);
+      if (!safe_access(*(char **)fst)) exit(-1);
+
+      f->eax = (uint32_t) remove(*(const char **) fst);
       break;
     case SYS_SEEK:
-      check_esp(fst);
-      check_esp(snd);
+//      check_esp(fst);
+//      check_esp(snd);
       seek(*(int *) fst, *(unsigned int *) snd);
       break;
     case SYS_TELL:
-      check_esp(fst);
+//      check_esp(fst);
       f->eax = tell(*(int *) fst);
       break;
     default:break;
@@ -141,6 +150,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 
 void
 halt(void) {
+  // printf(NULL)
   shutdown_power_off();
 }
 
@@ -148,21 +158,22 @@ void
 exit (int status) {
   struct thread *cur = thread_current();
   printf("%s: exit(%d)\n", cur->name, status);
+
   thread_exit();
 }
 
 pid_t
 exec(const char *cmd_line) {
   check_esp(cmd_line);
-  tid_t tid = process_execute(cmd_line);
-  struct thread *parent_thread = (struct thread *)&tid;
+  pid_t pid = process_execute(cmd_line);
+  struct thread *parent_thread = (struct thread *)&pid;
 
-  if (tid == TID_ERROR) {
-    return -1;
+  if (pid == TID_ERROR) {
+    pid = -1;
   }
 
   if(strlen(parent_thread->name) < strlen(cmd_line)) {
-    wait(tid);
+    wait(pid);
   }
 //
 //  if(wait(tid) != -1) {
@@ -173,11 +184,13 @@ exec(const char *cmd_line) {
 
 int
 wait(pid_t pid) {
+  // printf(NULL)
   return process_wait(pid);
 }
 
 bool
 create(const char *file, unsigned initial_size) {
+  // printf(NULL)
   if (strnlen(file, 15) > 14) {
     return false;
   }
@@ -190,11 +203,13 @@ create(const char *file, unsigned initial_size) {
 
 bool
 remove(const char *file) {
+  // printf(NULL)
   return filesys_remove(file);
 }
 
 int
 open(const char *file) {
+  // printf(NULL)
   struct file *file1 = filesys_open(file);
 
   if (strlen(file) == 0 || file1 == NULL) {
@@ -214,12 +229,17 @@ open(const char *file) {
 
 int
 filesize(int fd) {
+  // printf(NULL)
   return file_length(fileFdArray[fd-2].f);
 }
 
 int
 read(int fd, void *buffer, unsigned size) {
-  check_esp(buffer);
+  // printf(NULL)
+  if (fd<1 || fd>130) {
+    exit(-1);
+  }
+  if (!safe_access(buffer)) exit(-1);
   if (fd == 0) {
     return input_getc();
   }
@@ -235,14 +255,10 @@ read(int fd, void *buffer, unsigned size) {
 
 int
 write(int fd, const void *buffer, unsigned size) {
-
-//  printf("** inwrite(), fd = %d, buffer = 0x%d, size = %u\n", fd, buffer, size);
   if (fd<1 || fd>130) {
     exit(-1);
   }
-
-  check_esp(buffer);
-
+  if (!safe_access(buffer)) exit(-1);
   if (fd == 1) {
     // size may not bigger than hundred bytes
     // otherwise may confused
@@ -258,16 +274,19 @@ write(int fd, const void *buffer, unsigned size) {
 
 void
 seek(int fd, unsigned position) {
+  // printf(NULL)
   file_seek(fileFdArray[fd-2].f, position);
 }
 
 unsigned
 tell(int fd) {
+  // printf(NULL)
   return (unsigned int) file_tell(fileFdArray[fd - 2].f);
 }
 
 void
 close(int fd) {
+  // printf(NULL)
   if (fd<129) {
     file_close(fileFdArray[fd-2].f);
   }
