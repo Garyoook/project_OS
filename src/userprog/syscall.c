@@ -164,15 +164,22 @@ exit (int status) {
 
 pid_t
 exec(const char *cmd_line) {
+  safe_access(cmd_line);
   pid_t pid = process_execute(cmd_line);
+  struct thread *parent_thread = (struct thread *)&pid;
 
   if (pid == TID_ERROR) {
     pid = -1;
   }
-//  printf("PPPPPPPPPPPPPPPIIIIIIIIIIIIIIIDDDDDDDDDDD:::%d\n",  (int)pid);
-  return pid;
-//  list_push_back(&thread_current()->child_process, &thread_current()->child_elem);
-//  return process_execute(cmd_line);
+
+  if(strlen(parent_thread->name) < strlen(cmd_line)) {
+    wait(pid);
+  }
+//
+//  if(wait(tid) != -1) {
+//    return tid;
+//  }
+  return -1;
 }
 
 int

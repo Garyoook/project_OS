@@ -42,11 +42,11 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Create a new thread to execute FILE_NAME. */
-  char *command_name, *save_ptr;
-
-  command_name = strtok_r((char *) file_name, " ", &save_ptr);
-//  printf("%saaaaaa\n", command_name);
-//  printf("%saaaaaaaaaa\n", file_name);
+  char command_name[300];
+  char file_name_copy[300];
+  char *save_ptr;
+  strlcpy(file_name_copy, file_name, 200);
+  strlcpy(command_name, strtok_r((char *) file_name_copy, " ", &save_ptr), 200);
 
   tid = thread_create (command_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
@@ -204,14 +204,15 @@ int
 process_wait (tid_t child_tid UNUSED) 
 {
   struct thread *t = &child_tid;
-  t->parent = thread_current();
+
+//  t->parent = thread_current();
   enum intr_level old_level;
   old_level = intr_disable();
 
   thread_block();
 
   intr_set_level(old_level);
-  return -1;
+  return child_tid;
 }
 
 /* Free the current process's resources. */
