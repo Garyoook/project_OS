@@ -178,7 +178,14 @@ exec(const char *cmd_line) {
 int
 wait(pid_t pid) {
   // printf(NULL)
-  return process_wait(pid);
+  struct thread *t = (struct thread *) &pid;
+  if (t->parent != thread_current() && !t->wait) {
+    t->wait = true;
+    pid = process_wait(pid);
+  } else {
+    pid = -1;
+  }
+  return pid;
 }
 
 bool

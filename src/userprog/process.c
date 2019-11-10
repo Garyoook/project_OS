@@ -17,6 +17,8 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "syscall.h"
+
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -55,6 +57,8 @@ process_execute (const char *file_name)
 
 static int get_argc(char *name);
 
+static void check_stack_overflow(int used);
+
 // use this to pass and push the arguments to the stack:
 static bool argument_passing(void **esp, char *file_name) {
 // push arguments to the stack;
@@ -83,11 +87,10 @@ static bool argument_passing(void **esp, char *file_name) {
   for (int i = argc - 1; i >= 0; i--) {
     *esp = *esp - (strlen(argArr[i]) + 1);
     memcpy((char *)*esp, argArr[i], strlen(argArr[i]) + 1);
-//    printf("address of arguments %x\n", (unsigned int) *esp);
+    bytes_used += strlen(argArr[i] + 1);
+    check_stack_overflow(bytes_used);
     addrArr[i] = *esp;
   }
-
-
 
   // note that we have got the argc;
 
@@ -96,16 +99,21 @@ static bool argument_passing(void **esp, char *file_name) {
   size_t addr_diff = ((size_t)*esp - (size_t)addr);
   *esp = addr;
   memset(*esp, 0, addr_diff);
+  bytes_used += addr_diff;
+  check_stack_overflow(bytes_used);
 
   //push sentinel to the stack
   *esp = *esp - sizeof (char *);
   memset (*esp, 0, sizeof (char *));
+  bytes_used += sizeof(char *);
+  check_stack_overflow(bytes_used);
 
   // push the address of arguments to the stack:
   for (int i = argc - 1; i >= 0; i--) {
     *esp = *esp - sizeof(char *);
     memcpy(*esp, &addrArr[i], sizeof(char *));
-//    printf("value stored: %x\n", (unsigned int) *&addrArr[i]);
+    bytes_used += sizeof(char *);
+    check_stack_overflow(bytes_used);
   }
   addr_argv = *esp;
 
@@ -113,6 +121,8 @@ static bool argument_passing(void **esp, char *file_name) {
   // push address of the command name
   *esp = *esp - sizeof (char **);
   memcpy(*esp, &addr_argv, sizeof(char **));
+  bytes_used += sizeof(char **);
+  check_stack_overflow(bytes_used);
 
   //push the argc to the stack:
   *esp = *esp - sizeof (int);
@@ -121,12 +131,19 @@ static bool argument_passing(void **esp, char *file_name) {
   *esp = *esp - sizeof (void *);
   void *nullPtr = NULL;
   memcpy (*esp, &nullPtr, sizeof (void *));
+  bytes_used += sizeof(void *);
+  check_stack_overflow(bytes_used);
 
   return true;
 
 //
 }
 
+static void check_stack_overflow(int used) {
+  if (used > STACK_LIMIT) {
+    exit(-1);
+  }
+}
 
 
 /* A thread function that loads a user process and starts it
@@ -186,9 +203,8 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-//  struct thread *t = &child_tid;
-
-//  t->parent = thread_current();
+  struct thread *t = &child_tid;
+  t->parent = thread_current();
   enum intr_level old_level;
   old_level = intr_disable();
 

@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "fixed-point.h"
+#include "synch.h"
 
 /* List of all threads that are blocked. */
 struct list blocked_list;
@@ -118,6 +119,8 @@ struct thread
     struct thread *parent;
     struct list child_process;
     struct list_elem child_elem;
+    bool wait;
+    struct semaphore *sema;
 
 
 

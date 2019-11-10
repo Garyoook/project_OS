@@ -3,7 +3,7 @@
 
 #include "threads/thread.h"
 
-
+#define STACK_LIMIT 4096
 
 tid_t process_execute (const char *file_name);
 int process_wait (tid_t);
