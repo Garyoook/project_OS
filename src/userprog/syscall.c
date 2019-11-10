@@ -153,13 +153,22 @@ exit (int status) {
 
 pid_t
 exec(const char *cmd_line) {
+  check_esp(cmd_line);
   tid_t tid = process_execute(cmd_line);
+  struct thread *parent_thread = (struct thread *)&tid;
 
   if (tid == TID_ERROR) {
     return -1;
   }
 
-  return process_execute(cmd_line);
+  if(strlen(parent_thread->name) < strlen(cmd_line)) {
+    wait(tid);
+  }
+//
+//  if(wait(tid) != -1) {
+//    return tid;
+//  }
+  return -1;
 }
 
 int
