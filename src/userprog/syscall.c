@@ -27,13 +27,11 @@ struct fileWithFd{
 
 struct fileWithFd fileFdArray[128];
 int currentFd = 2;
-struct lock fd_lock;
 
 void
-syscall_init (void)
+syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-  lock_init(&fd_lock);
 }
 
 // for user access memory
@@ -89,7 +87,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
     case SYS_CLOSE:
       if (!safe_access(fst)) exit(-1);
-      close((int)fst);
+      close(*(int *)fst);
       break;
     case SYS_CREATE:
       if (!safe_access(fst)) exit(-1);
@@ -156,41 +154,57 @@ void
 exit (int status) {
   struct thread *cur = thread_current();
   printf("%s: exit(%d)\n", cur->name, status);
+  struct thread *parent = thread_current()->parent;
+  if (parent != NULL){
+    parent->child_process_tid[parent->child_pos] = thread_current()->tid;
+    parent->child_process_exit_status[parent->child_pos] = status;
+    parent->child_pos++;
+    parent->count--;
+    thread_unblock(cur->parent);
+  }
+//  if (parent != NULL){
+//  for (int i = 0; i < 100; i++){
+//    if (parent->child_process_tid[i] == thread_current()->tid){
+//      printf("cadsfsadfdsafdsaf  %d", parent->child_process_exit_status[i]);
+//    }}
+//  }
 
   thread_exit();
 }
 
 pid_t
 exec(const char *cmd_line) {
-  safe_access(cmd_line);
-  pid_t pid = process_execute(cmd_line);
-  struct thread *parent_thread = (struct thread *)&pid;
-
-  if (pid == TID_ERROR) {
-    pid = -1;
+  if (!safe_access(cmd_line)) {
+    return -1;
   }
 
-//  if(strlen(parent_thread->name) < strlen(cmd_line)) {
-//    wait(pid);
+  pid_t pid = process_execute(cmd_line);
+
+//  if (pid == TID_ERROR) {
+//    pid = -1;
 //  }
 //
 //  if(wait(tid) != -1) {
 //    return tid;
 //  }
-  return -1;
+  return pid;
 }
+
 
 int
 wait(pid_t pid) {
-  // printf(NULL)
-  struct thread *t = (struct thread *) &pid;
-  if (t->parent != thread_current() && !t->wait) {
-    t->wait = true;
-    pid = process_wait(pid);
-  } else {
-    pid = -1;
+  for (int i = 0; i< 100; i++){
+    if (thread_current()->child_process_tid[i] == pid){
+      return -1;
+    }
   }
-  return pid;
+
+
+  struct thread *t = lookup_tid(pid);
+  int result = process_wait(pid);
+
+  return result;
+
 }
 
 bool
@@ -251,8 +265,7 @@ read(int fd, void *buffer, unsigned size) {
 
   struct file *currentFile = fileFdArray[fd-2].f;
   if (currentFile != NULL) {
-    int current = file_tell(currentFile);
-    return file_read_at(currentFile, buffer, size, current);
+    return file_read(currentFile, buffer, size);
   } else {
     exit(-1);
   }
@@ -271,9 +284,7 @@ write(int fd, const void *buffer, unsigned size) {
     return 0;
   }
 
-  struct file *currentFile = fileFdArray[fd-2].f;
-  int current = file_tell(currentFile);
-  return file_write_at(currentFile, buffer, size, current);
+  return file_write(fileFdArray[fd-2].f, buffer, size);
 
 }
 
@@ -292,7 +303,13 @@ tell(int fd) {
 void
 close(int fd) {
   // printf(NULL)
+  if (fileFdArray[fd-2].f == NULL){
+    exit(-1);
+  }
   if (fd<129) {
     file_close(fileFdArray[fd-2].f);
+    fileFdArray[fd-2].f = NULL;
+  } else {
+    exit(-1);
   }
 }

@@ -51,6 +51,12 @@ process_execute (const char *file_name)
   strlcpy(command_name, strtok_r((char *) file_name_copy, " ", &save_ptr), FILE_NAME_LEN_LIMIT);
 
 
+  struct file *file = filesys_open(command_name);
+  if (file == NULL) {
+    return -1;
+  }
+  file_close(file);
+
   tid = thread_create (command_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
@@ -204,18 +210,32 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid)
 {
-  struct thread *t = &child_tid;
+  struct thread *t = lookup_tid(child_tid);
+  struct thread *cur = thread_current();
 
-//  t->parent = thread_current();
+
+  t->parent = thread_current();
+  cur->child_process_tid[cur->child_pos] = t->tid;
+  cur->child_pos++;
+  cur->count++;
+
   enum intr_level old_level;
   old_level = intr_disable();
 
   thread_block();
-
   intr_set_level(old_level);
-  return child_tid;
+
+  for (int i = 0; i < 100; i++){
+    if (cur->child_process_tid[i] == child_tid){
+      if (cur->child_process_exit_status[i] != -1)
+      return cur->child_process_exit_status[i];
+    }
+  }
+
+
+  return -1;
 }
 
 /* Free the current process's resources. */
@@ -224,10 +244,6 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-
-  if (cur->parent != NULL) {
-    thread_unblock(cur->parent);
-  }
 
 
   /* Destroy the current process's page directory and switch back
