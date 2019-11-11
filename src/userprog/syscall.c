@@ -287,6 +287,7 @@ write(int fd, const void *buffer, unsigned size) {
     return 0;
   }
 
+  printf("fd:%d", fd);
   return file_write(fileFdArray[fd-2].f, buffer, size);
 
 }
@@ -305,8 +306,10 @@ tell(int fd) {
 
 void
 close(int fd) {
-  // printf(NULL)
-  if (fd<129) {
-    file_close(fileFdArray[fd-2].f);
-  }
+//  // printf(NULL)
+
+  printf("close fd:%d", fd);
+//  if (fd<129) {
+//    file_close(fileFdArray[fd-2].f);
+//  }
 }
