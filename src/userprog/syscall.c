@@ -4,7 +4,6 @@
 #include <user/syscall.h>
 #include <string.h>
 #include "threads/vaddr.h"
-#include "threads/malloc.h"
 #include "devices/shutdown.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
@@ -28,30 +27,10 @@ struct fileWithFd{
 struct fileWithFd fileFdArray[128];
 int currentFd = 2;
 
-//
-struct fd
-{
-  int fd_num;
-  tid_t owner;
-  struct file *file_struct;
-  struct list_elem elem;
-};
-
-/* a list of open files, represents all the files open by the user process
-   through syscalls. */
-struct list open_files;
-
-/* the lock used by syscalls involving file system to ensure only one thread
-   at a time is accessing file system */
-struct lock fs_lock;
-//
-
 void
 syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-  list_init (&open_files);
-  lock_init (&fs_lock);
 }
 
 // for user access memory
@@ -178,82 +157,42 @@ halt(void) {
 void
 exit (int status) {
   struct thread *cur = thread_current();
-//  printf("%s: exit(%d)\n", cur->name, status);
-//
-//  thread_exit();
+  printf("%s: exit(%d)\n", cur->name, status);
 
-  struct child_status *child;
-  printf ("%s: exit(%d)\n", cur->name, status);
-
-  struct thread *parent = thread_get_by_id (cur->parent_tid);
-  if (parent != NULL)
-  {
-    struct list_elem *e = list_tail(&parent->child_process);
-    while ((e = list_prev (e)) != list_head (&parent->child_process))
-    {
-      child = list_entry (e, struct child_status, elem_child_status);
-      if (child->child_id == cur->tid)
-      {
-        lock_acquire (&parent->lock_child);
-        child->is_exit_called = true;
-        child->child_exit_status = status;
-        lock_release (&parent->lock_child);
-      }
-    }
-  }
-  thread_exit ();
+  thread_exit();
 }
 
 pid_t
 exec(const char *cmd_line) {
-//  safe_access(cmd_line);
-//  pid_t pid = process_execute(cmd_line);
-//  struct thread *parent_thread = (struct thread *)&pid;
-//
-//  if (pid == TID_ERROR) {
-//    pid = -1;
-//  }
-//
-//  if(strlen(parent_thread->name) < strlen(cmd_line)) {
-//    wait(pid);
-//  }
-////
-////  if(wait(tid) != -1) {
-////    return tid;
-////  }
+  safe_access(cmd_line);
+  pid_t pid = process_execute(cmd_line);
+  struct thread *parent_thread = (struct thread *)&pid;
 
-  tid_t tid;
-  struct thread *cur;
-  /* check if the user pinter is valid */
-  if (!safe_access (cmd_line))
-  {
-    exit (-1);
+  if (pid == TID_ERROR) {
+    pid = -1;
   }
 
-  cur = thread_current ();
-
-  cur->child_load_status = 0;
-  tid = process_execute (cmd_line);
-  lock_acquire(&cur->lock_child);
-  while (cur->child_load_status == 0)
-    cond_wait(&cur->cond_child, &cur->lock_child);
-  if (cur->child_load_status == -1)
-    tid = -1;
-  lock_release(&cur->lock_child);
-  return tid;
+  if(strlen(parent_thread->name) < strlen(cmd_line)) {
+    wait(pid);
+  }
+//
+//  if(wait(tid) != -1) {
+//    return tid;
+//  }
+  return -1;
 }
 
 int
 wait(pid_t pid) {
-//  struct thread *t = (struct thread *) &pid;
-//  if (t->parent != thread_current() && !t->wait) {
-//    t->wait = true;
-//    pid = process_wait(pid);
-//  } else {
-//    pid = -1;
-//  }
-//  return pid;
-  return process_wait(pid);
+  // printf(NULL)
+  struct thread *t = (struct thread *) &pid;
+  if (t->parent != thread_current() && !t->wait) {
+    t->wait = true;
+    pid = process_wait(pid);
+  } else {
+    pid = -1;
+  }
+  return pid;
 }
 
 bool
@@ -358,27 +297,4 @@ close(int fd) {
   if (fd<129) {
     file_close(fileFdArray[fd-2].f);
   }
-}
-
-//
-void
-close_file_by_owner (tid_t tid)
-{
-  struct list_elem *e;
-  struct list_elem *next;
-  struct fd *fd_struct;
-  e = list_begin (&open_files);
-  while (e != list_tail (&open_files))
-  {
-    next = list_next (e);
-    fd_struct = list_entry (e, struct fd, elem);
-    if (fd_struct->owner == tid)
-    {
-      list_remove (e);
-      file_close (fd_struct->file_struct);
-      free (fd_struct);
-    }
-    e = next;
-  }
-  //
 }

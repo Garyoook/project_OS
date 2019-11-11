@@ -15,7 +15,6 @@
 #include "threads/init.h"
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
-#include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "syscall.h"
@@ -35,9 +34,6 @@ process_execute (const char *file_name)
   char *fn_copy;
   tid_t tid;
 
-  struct child_status *child;
-  struct thread *cur;
-
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
@@ -52,23 +48,9 @@ process_execute (const char *file_name)
   strlcpy(file_name_copy, file_name, 200);
   strlcpy(command_name, strtok_r((char *) file_name_copy, " ", &save_ptr), 200);
 
-//  char *cmd_name, *args;
-//  cmd_name = strtok_r (fn_copy, " ", &args);
-
   tid = thread_create (command_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
-  {
-    palloc_free_page(fn_copy);
-  } else {
-    cur = thread_current();
-    child = calloc(1, sizeof(struct child_status));
-    if (child) {
-      child->child_id = tid;
-      child->is_exit_called = false;
-      child ->has_been_waited = false;
-      list_push_back(&cur->child_process, &child->elem_child_status);
-    }
-  }
+    palloc_free_page (fn_copy); 
   return tid;
 }
 
@@ -173,10 +155,6 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
-  //
-  struct thread *cur;
-  struct thread *parent;
-
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -196,16 +174,6 @@ start_process (void *file_name_)
   if (success) {
     success = argument_passing(
         &if_.esp, file_name);
-  }
-
-  cur = thread_current ();
-  parent = thread_get_by_id (cur->parent_tid);
-  if (parent != NULL)
-  {
-    lock_acquire(&parent->lock_child);
-    parent->child_load_status = success;
-    cond_signal(&parent->cond_child, &parent->lock_child);
-    lock_release(&parent->lock_child);
   }
 
   /* If load failed, quit. */
@@ -235,52 +203,16 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-//  struct thread *t = &child_tid;
-//
-////  t->parent = thread_current();
-//  enum intr_level old_level;
-//  old_level = intr_disable();
-//
-//  thread_block();
-//
-//  intr_set_level(old_level);
-//  return child_tid;
+  struct thread *t = &child_tid;
 
-//
-  int status;
-  struct thread *cur;
-  struct child_status *child = NULL;
-  struct list_elem *e;
-  if (child_tid != TID_ERROR)
-  {
-    cur = thread_current ();
-    e = list_tail (&cur->child_process);
-    while ((e = list_prev (e)) != list_head (&cur->child_process))
-    {
-      child = list_entry(e, struct child_status, elem_child_status);
-      if (child->child_id == child_tid)
-        break;
-    }
+//  t->parent = thread_current();
+  enum intr_level old_level;
+  old_level = intr_disable();
 
-    if (child == NULL)
-      status = -1;
-    else
-    {
-      lock_acquire(&cur->lock_child);
-      while (thread_get_by_id (child_tid) != NULL)
-        cond_wait (&cur->cond_child, &cur->lock_child);
-      if (!child->is_exit_called || child->has_been_waited)
-        status = -1;
-      else {
-        status = child->child_exit_status;
-        child->has_been_waited = true;
-      }
-      lock_release(&cur->lock_child);
-    }
-  } else {
-    status = TID_ERROR;
-  }
-  return status;
+  thread_block();
+
+  intr_set_level(old_level);
+  return child_tid;
 }
 
 /* Free the current process's resources. */
@@ -289,14 +221,10 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-  struct thread *parent;
-  struct list_elem *e;
-  struct list_elem *next;
-  struct child_status *child;
 
-//  if (cur->parent != NULL) {
-//    thread_unblock(cur->parent);
-//  }
+  if (cur->parent != NULL) {
+    thread_unblock(cur->parent);
+  }
 
 
   /* Destroy the current process's page directory and switch back
@@ -315,34 +243,6 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-
-  /*free children list*/
-  e = list_begin (&cur->child_process);
-  while (e != list_tail(&cur->child_process))
-  {
-    next = list_next (e);
-    child = list_entry (e, struct child_status, elem_child_status);
-    list_remove (e);
-    free (child);
-    e = next;
-  }
-
-  /*re-enable the file's writable property*/
-  if (cur->executable != NULL)
-    file_allow_write (cur->executable);
-
-  /*free files whose owner is the current thread*/
-  close_file_by_owner (cur->tid);
-
-  parent = thread_get_by_id (cur->parent_tid);
-  if (parent != NULL)
-  {
-    lock_acquire (&parent->lock_child);
-    if (parent->child_load_status == 0)
-      parent->child_load_status = -1;
-    cond_signal (&parent->cond_child, &parent->lock_child);
-    lock_release (&parent->lock_child);
-  }
 }
 
 /* Sets up the CPU for running user code in the current

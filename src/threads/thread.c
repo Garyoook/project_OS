@@ -425,22 +425,6 @@ thread_get_recent_cpu (void)
   return 0;
 }
 
-/* Get the thread by its tid */
-struct thread
-*thread_get_by_id (tid_t id)
-{
-  ASSERT (id != TID_ERROR);
-  struct list_elem *e;
-  struct thread *t;
-  e = list_tail (&all_list);
-  while ((e = list_prev (e)) != list_head (&all_list))
-  {
-    t = list_entry (e, struct thread, allelem);
-    if (t->tid == id && t->status != THREAD_DYING)
-      return t;
-  }
-  return NULL;
-}
 /* Idle thread.  Executes when no other thread is ready to run.
 
    The idle thread is initially put on the ready list by
