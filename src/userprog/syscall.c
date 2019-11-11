@@ -167,11 +167,6 @@ exec(const char *cmd_line) {
   if (!safe_access(cmd_line)) {
     return -1;
   }
-  struct file *file = filesys_open(cmd_line);
-  if (file == NULL) {
-    return -1;
-  }
-  file_close(file);
   pid_t pid = process_execute(cmd_line);
   struct thread *parent_thread = (struct thread *) &pid;
 
@@ -182,10 +177,6 @@ exec(const char *cmd_line) {
   if (strlen(parent_thread->name) < strlen(cmd_line)) {
     wait(pid);
   }
-//
-//  if(wait(tid) != -1) {
-//    return tid;
-//  }
   return pid;
 }
 
@@ -193,6 +184,9 @@ exec(const char *cmd_line) {
 int
 wait(pid_t pid) {
   // printf(NULL)
+  if (pid>1024) {
+    return -1;
+  }
   struct thread *t = (struct thread *) &pid;
   if (t->parent != thread_current() && !t->wait) {
     t->wait = true;

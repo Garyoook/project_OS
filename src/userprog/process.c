@@ -47,7 +47,11 @@ process_execute (const char *file_name)
   char *save_ptr;
   strlcpy(file_name_copy, file_name, 200);
   strlcpy(command_name, strtok_r((char *) file_name_copy, " ", &save_ptr), 200);
-
+  struct file *file = filesys_open(command_name);
+  if (file == NULL) {
+    return -1;
+  }
+  file_close(file);
   tid = thread_create (command_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
