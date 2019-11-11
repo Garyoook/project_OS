@@ -86,6 +86,8 @@ typedef int tid_t;
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
 
+
+
 #define MAX_LEVEL 8+1  /*Max level of donation*/
 
 struct thread
@@ -119,6 +121,12 @@ struct thread
     struct thread *parent;
     struct list child_process;
     struct list_elem child_elem;
+    int child_process_tid[100];
+    int child_process_exit_status[100];
+    int child_pos;
+    int count;
+    bool isKernel;
+
     bool wait;
     struct semaphore *sema;
 
@@ -183,5 +191,6 @@ void upDate_donate_chain(struct thread *t, int new_priority);
 void update_load_avg(void);
 void update_recent_cpu(void);
 void update_BSD(void);
+struct thread* lookup_tid(tid_t tid);
 
 #endif /* threads/thread.h */

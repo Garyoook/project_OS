@@ -158,41 +158,57 @@ void
 exit (int status) {
   struct thread *cur = thread_current();
   printf("%s: exit(%d)\n", cur->name, status);
+  struct thread *parent = thread_current()->parent;
+  if (parent != NULL){
+    parent->child_process_tid[parent->child_pos] = thread_current()->tid;
+    parent->child_process_exit_status[parent->child_pos] = status;
+    parent->child_pos++;
+    parent->count--;
+    thread_unblock(cur->parent);
+  }
+//  if (parent != NULL){
+//  for (int i = 0; i < 100; i++){
+//    if (parent->child_process_tid[i] == thread_current()->tid){
+//      printf("cadsfsadfdsafdsaf  %d", parent->child_process_exit_status[i]);
+//    }}
+//  }
 
   thread_exit();
 }
 
 pid_t
 exec(const char *cmd_line) {
-  safe_access(cmd_line);
+  if (!safe_access(cmd_line)) {
+    return -1;
+  }
+
   pid_t pid = process_execute(cmd_line);
-  struct thread *parent_thread = (struct thread *)&pid;
 
-  if (pid == TID_ERROR) {
-    pid = -1;
-  }
-
-  if(strlen(parent_thread->name) < strlen(cmd_line)) {
-    wait(pid);
-  }
+//  if (pid == TID_ERROR) {
+//    pid = -1;
+//  }
 //
 //  if(wait(tid) != -1) {
 //    return tid;
 //  }
-  return -1;
+  return pid;
 }
 
 int
 wait(pid_t pid) {
-  // printf(NULL)
-  struct thread *t = (struct thread *) &pid;
-  if (t->parent != thread_current() && !t->wait) {
-    t->wait = true;
-    pid = process_wait(pid);
-  } else {
-    pid = -1;
+
+  for (int i = 0; i< 100; i++){
+    if (thread_current()->child_process_tid[i] == pid){
+      return -1;
+    }
   }
-  return pid;
+
+
+  struct thread *t = lookup_tid(pid);
+  int result = process_wait(pid);
+
+  return result;
+
 }
 
 bool

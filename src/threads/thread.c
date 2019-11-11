@@ -265,13 +265,16 @@ static void
 repeated_check_blocked_list(struct list *list, int64_t ticks)
 {
   if (!list_empty(list)) {
-    struct thread * front_thread =
-        list_entry(list_front(list),struct thread, elem);
+    struct list_elem *e = list_begin(list);
 
-    if (front_thread->blocked_ticks <= ticks) {
-      list_remove(&front_thread->elem);
-      thread_unblock(front_thread);
-      repeated_check_blocked_list(list, ticks);
+    while (e != list_end(list)){
+      struct thread *t = list_entry(e, struct thread, elem);
+      if (t->blocked_ticks <= ticks){
+        e = list_remove(&t->elem);
+        thread_unblock(t);
+      } else {
+        break;
+      }
     }
   }
 }
@@ -513,8 +516,14 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
 
-  t->parent = list_size(&all_list) == 0 ? NULL : thread_current();
+  t->parent = NULL;
   t->wait = false;
+  t->count = 0;
+  for (int i = 0; i < 100; i++){
+    t->child_process_exit_status[i] = -1;
+    t->child_process_tid[i] = -1;
+  }
+  t->child_pos = 0;
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
@@ -629,6 +638,22 @@ allocate_tid (void)
   lock_release (&tid_lock);
 
   return tid;
+}
+
+
+struct thread* lookup_tid(tid_t tid){
+
+
+
+  if (!list_empty(&all_list)) {
+    struct list_elem *e = list_begin(&all_list);
+    while (e != list_end(&all_list)){
+      struct thread *t = list_entry(e, struct thread, allelem);
+      if (t->tid == tid) return t;
+      e = e->next;
+    }
+  }
+  return NULL;
 }
 
 /* Offset of `stack' member within `struct thread'.
