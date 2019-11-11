@@ -120,13 +120,16 @@ struct thread
     struct list child_process;
     struct list_elem child_elem;
     bool wait;
-    struct semaphore *sema;
 
 
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+  struct semaphore *waiting_child_sema;
+  struct list file_list;
+  struct list_elem file_elem;
+  tid_t parent_tid;
 #endif
 
     /* Owned by thread.c. */

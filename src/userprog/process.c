@@ -24,6 +24,8 @@ static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
 
+#define FILE_NAME_LEN_LIMIT 15
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -42,15 +44,16 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Create a new thread to execute FILE_NAME. */
-  char command_name[300];
-  char file_name_copy[300];
+  char command_name[FILE_NAME_LEN_LIMIT];
+  char file_name_copy[FILE_NAME_LEN_LIMIT];
   char *save_ptr;
-  strlcpy(file_name_copy, file_name, 200);
-  strlcpy(command_name, strtok_r((char *) file_name_copy, " ", &save_ptr), 200);
+  strlcpy(file_name_copy, file_name, FILE_NAME_LEN_LIMIT);
+  strlcpy(command_name, strtok_r((char *) file_name_copy, " ", &save_ptr), FILE_NAME_LEN_LIMIT);
+
 
   tid = thread_create (command_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+    palloc_free_page (fn_copy);
   return tid;
 }
 

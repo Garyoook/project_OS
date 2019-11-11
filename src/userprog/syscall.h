@@ -2,6 +2,7 @@
 #define USERPROG_SYSCALL_H
 
 #include <user/syscall.h>
+#include "threads/thread.h"
 
 void syscall_init (void);
 
@@ -18,6 +19,5 @@ int write (int fd, const void *buffer, unsigned size);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
-bool check_esp(void const *esp);
 
 #endif /* userprog/syscall.h */

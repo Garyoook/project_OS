@@ -22,15 +22,18 @@ void release_all_locks(struct thread *t);
 struct fileWithFd{
     int fd;
     struct file *f;
+//    tid_t owner;
 };
 
 struct fileWithFd fileFdArray[128];
 int currentFd = 2;
+struct lock fd_lock;
 
 void
-syscall_init (void) 
+syscall_init (void)
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+  lock_init(&fd_lock);
 }
 
 // for user access memory
@@ -81,27 +84,24 @@ syscall_handler (struct intr_frame *f UNUSED)
   switch (syscall_num) {
 
     case SYS_EXEC:
-//      check_esp(fst);
-//      check_esp(*(char **)fst);
+      if (!safe_access(fst)) exit(-1);
       f->eax = (uint32_t) exec(*(char **)fst);
       break;
     case SYS_CLOSE:
-//      check_esp(fst);
+      if (!safe_access(fst)) exit(-1);
       close((int)fst);
       break;
     case SYS_CREATE:
-//      check_esp(fst);
-//      check_esp(*(char **)fst);
-//      check_esp(snd);
+      if (!safe_access(fst)) exit(-1);
+      if (!safe_access(snd)) exit(-1);
       f->eax = (uint32_t) create(*(char **)fst, (void *)*(int *)snd);
       break;
     case SYS_EXIT:
-
       if (!safe_access(fst)) exit(-1);//must check it here to pass sc-bad-arg
       exit(*(int*)fst);
       break;
     case SYS_FILESIZE:
-//      check_esp(fst);
+      if (!safe_access(fst)) exit(-1);
       f->eax = (uint32_t) filesize(*(int *) fst);
       break;
     case SYS_HALT:
@@ -112,36 +112,34 @@ syscall_handler (struct intr_frame *f UNUSED)
       f->eax = (uint32_t) open(*(char **)fst);
       break;
     case SYS_READ:
-//      check_esp(fst);
-//      check_esp(snd);
-//      check_esp(*snd);
-//      check_esp(trd);
+      if (!safe_access(fst)) exit(-1);
+      if (!safe_access(snd)) exit(-1);
+      if (!safe_access(trd)) exit(-1);
       f->eax = (uint32_t) read(*(int *)fst, *snd, *(unsigned *) trd);
       break;
     case SYS_WRITE:
-//      check_esp(fst);
-//      check_esp(snd);
-//      check_esp(*snd);
-//      check_esp(trd);
+      if (!safe_access(fst)) exit(-1);
+      if (!safe_access(snd)) exit(-1);
+      if (!safe_access(trd)) exit(-1);
       f->eax = (uint32_t) write(*(int *)fst, *snd, *(unsigned *) trd);
       break;
     case SYS_WAIT:
-//      check_esp(fst);
+      if (!safe_access(fst)) exit(-1);
       f->eax = (uint32_t) wait(*(pid_t *)fst);
       break;
     case SYS_REMOVE:
-//      check_esp(fst);
+      if (!safe_access(fst)) exit(-1);
       if (!safe_access(*(char **)fst)) exit(-1);
 
       f->eax = (uint32_t) remove(*(const char **) fst);
       break;
     case SYS_SEEK:
-//      check_esp(fst);
-//      check_esp(snd);
+      if (!safe_access(fst)) exit(-1);
+      if (!safe_access(snd)) exit(-1);
       seek(*(int *) fst, *(unsigned int *) snd);
       break;
     case SYS_TELL:
-//      check_esp(fst);
+      if (!safe_access(fst)) exit(-1);
       f->eax = tell(*(int *) fst);
       break;
     default:break;
@@ -172,9 +170,9 @@ exec(const char *cmd_line) {
     pid = -1;
   }
 
-  if(strlen(parent_thread->name) < strlen(cmd_line)) {
-    wait(pid);
-  }
+//  if(strlen(parent_thread->name) < strlen(cmd_line)) {
+//    wait(pid);
+//  }
 //
 //  if(wait(tid) != -1) {
 //    return tid;
