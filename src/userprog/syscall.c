@@ -230,6 +230,11 @@ remove(const char *file) {
 int
 open(const char *file) {
   // printf(NULL)
+
+
+
+
+
   struct file *file1 = filesys_open(file);
 
   if (strlen(file) == 0 || file1 == NULL) {
@@ -271,6 +276,7 @@ read(int fd, void *buffer, unsigned size) {
   }
   if (!safe_access(buffer)) exit(-1);
   if (fd == 0) {
+
     return input_getc();
   }
   fileStatus[fd-2] = true;
@@ -278,7 +284,10 @@ read(int fd, void *buffer, unsigned size) {
   struct file *currentFile = fileFdArray[fd - 2].f;
 
   if (currentFile != NULL) {
-    return file_read(currentFile, buffer, size);
+    fileStatus[fd-2] = false;
+    int id = file_read(currentFile, buffer, size);
+
+    return id;
   } else {
     exit(-1);
   }
@@ -294,20 +303,18 @@ write(int fd, const void *buffer, unsigned size) {
     // otherwise may confused
     putbuf(buffer, size);
     return 0;
-  } else {
-    if (tidArray[fd-2] != thread_current()->tid) {
-      exit(-1);
-    } else {
-      if (!fileStatus[fd - 2]) {
-        file_allow_write(fileFdArray[fd - 2].f);
-      }
-    }
   }
 
-  int return_size = file_write(fileFdArray[fd-2].f, buffer, size);
+  if (tidArray[fd-2] != thread_current()->tid && !fileStatus[fd - 2]) {
+    exit(-1);
+  } else {
+    file_allow_write(fileFdArray[fd - 2].f);
+  }
+
+  int result = file_write(fileFdArray[fd-2].f, buffer, size);
 
   file_deny_write(fileFdArray[fd-2].f);
-  return return_size;
+  return result;
 
 }
 
@@ -327,15 +334,16 @@ void
 close(int fd) {
   // printf(NULL)
   if (fileFdArray[fd-2].f == NULL){
-    exit(-1);
+    return;
   }
   if (tidArray[fd-2] != thread_current()->tid) {
-    exit(-1);
+    return;
   }
   if (fd<129) {
+    fileStatus[fd-2] = false;
     file_close(fileFdArray[fd-2].f);
     fileFdArray[fd-2].f = NULL;
   } else {
-    exit(-1);
+    return;
   }
 }
