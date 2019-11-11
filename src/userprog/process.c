@@ -33,7 +33,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name)
 {
-  char *fn_copy;
+char *fn_copy;
   tid_t tid;
 
   /* Make a copy of FILE_NAME.
@@ -70,6 +70,9 @@ static void check_stack_overflow(int used);
 
 // use this to pass and push the arguments to the stack:
 static bool argument_passing(void **esp, char *file_name) {
+
+
+
 // push arguments to the stack;
   enum intr_level old_level;
   old_level = intr_disable();
@@ -77,22 +80,25 @@ static bool argument_passing(void **esp, char *file_name) {
   char s[cmdLen];
   strlcpy(s, file_name, (cmdLen + 1));
 
+
   // keep checking this to ensure the arguments do not exceed a single page;
   int bytes_used = 0;
 
   char *token, *save_ptr;
+  int argc= 0;
 
-  int j = 0;
-  int argc = get_argc(file_name);
-  char *argArr[argc];
-  void *addrArr[argc];
+  char *argArr[64];
+  void *addrArr[64];
   void *addr_argv;
+
 
   for (token = strtok_r (s, " ", &save_ptr); token != NULL;
        token = strtok_r (NULL, " ", &save_ptr)) {
-    argArr[j] = token;
-    j++;
+    argArr[argc] = token;
+    argc++;
   }
+
+
 
   // push the arguments to the stack;
   for (int i = argc - 1; i >= 0; i--) {
@@ -518,12 +524,13 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
 }
 
 static int get_argc(char *name) {
+  size_t cmdLen = strlen(name);
+  char temp[cmdLen];
+  strlcpy(temp, name, (cmdLen + 1));
   int argc = 0;
   char *token, *save_ptr;
-  size_t cmdLen = strlen(name);
-  char s[cmdLen];
-  strlcpy(s, name, (cmdLen + 1));
-  for (token = strtok_r (s, " ", &save_ptr); token != NULL;
+
+  for (token = strtok_r (temp, " ", &save_ptr); token != NULL;
        token = strtok_r (NULL, " ", &save_ptr)) {
     argc++;
   }

@@ -22,10 +22,11 @@ void release_all_locks(struct thread *t);
 struct fileWithFd{
     int fd;
     struct file *f;
-//    tid_t owner;
 };
 
 struct fileWithFd fileFdArray[128];
+tid_t tidArray[128];
+bool fileStatus[128];
 int currentFd = 2;
 
 void
@@ -95,6 +96,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       f->eax = (uint32_t) create(*(char **)fst, (void *)*(int *)snd);
       break;
     case SYS_EXIT:
+
       if (!safe_access(fst)) exit(-1);//must check it here to pass sc-bad-arg
       exit(*(int*)fst);
       break;
@@ -190,7 +192,6 @@ exec(const char *cmd_line) {
   return pid;
 }
 
-
 int
 wait(pid_t pid) {
   for (int i = 0; i< 100; i++){
@@ -239,16 +240,23 @@ open(const char *file) {
     currentFd++;
     fileFdArray[currentFd-2].fd = currentFd;
     fileFdArray[currentFd-2].f = file1;
+    tidArray[currentFd-2] = thread_current()->tid;
+    fileStatus[currentFd-2] = false;
     // will use a size 130 array of file better than create a sturct for it?
   } else {
     return -1;
   }
+
+  file_deny_write(file1);
   return currentFd;
 }
 
 int
 filesize(int fd) {
   // printf(NULL)
+  if (fileFdArray[fd-2].f == NULL) {
+    exit(-1);
+  }
   return file_length(fileFdArray[fd-2].f);
 }
 
@@ -258,12 +266,17 @@ read(int fd, void *buffer, unsigned size) {
   if (fd<1 || fd>130) {
     exit(-1);
   }
+  if (tidArray[fd-2] != thread_current()->tid) {
+    exit(-1);
+  }
   if (!safe_access(buffer)) exit(-1);
   if (fd == 0) {
     return input_getc();
   }
+  fileStatus[fd-2] = true;
 
-  struct file *currentFile = fileFdArray[fd-2].f;
+  struct file *currentFile = fileFdArray[fd - 2].f;
+
   if (currentFile != NULL) {
     return file_read(currentFile, buffer, size);
   } else {
@@ -276,15 +289,25 @@ write(int fd, const void *buffer, unsigned size) {
   if (fd<1 || fd>130) {
     exit(-1);
   }
-  if (!safe_access(buffer)) exit(-1);
   if (fd == 1) {
     // size may not bigger than hundred bytes
     // otherwise may confused
     putbuf(buffer, size);
     return 0;
+  } else {
+    if (tidArray[fd-2] != thread_current()->tid) {
+      exit(-1);
+    } else {
+      if (!fileStatus[fd - 2]) {
+        file_allow_write(fileFdArray[fd - 2].f);
+      }
+    }
   }
 
-  return file_write(fileFdArray[fd-2].f, buffer, size);
+  int return_size = file_write(fileFdArray[fd-2].f, buffer, size);
+
+  file_deny_write(fileFdArray[fd-2].f);
+  return return_size;
 
 }
 
@@ -304,6 +327,9 @@ void
 close(int fd) {
   // printf(NULL)
   if (fileFdArray[fd-2].f == NULL){
+    exit(-1);
+  }
+  if (tidArray[fd-2] != thread_current()->tid) {
     exit(-1);
   }
   if (fd<129) {
