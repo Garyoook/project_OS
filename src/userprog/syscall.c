@@ -26,11 +26,11 @@ struct fileWithFd{
 
 struct fileWithFd fileFdArray[128];
 tid_t tidArray[128];
-bool fileStatus[128];
+bool canBeWritten[128];
 int currentFd = 2;
 
 void
-syscall_init (void) 
+syscall_init (void)
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
@@ -241,7 +241,7 @@ open(const char *file) {
     fileFdArray[currentFd-2].fd = currentFd;
     fileFdArray[currentFd-2].f = file1;
     tidArray[currentFd-2] = thread_current()->tid;
-    fileStatus[currentFd-2] = false;
+    canBeWritten[currentFd-2] = true;
     // will use a size 130 array of file better than create a sturct for it?
   } else {
     return -1;
@@ -273,7 +273,7 @@ read(int fd, void *buffer, unsigned size) {
   if (fd == 0) {
     return input_getc();
   }
-  fileStatus[fd-2] = true;
+  canBeWritten[fd-2] = false;
 
   struct file *currentFile = fileFdArray[fd - 2].f;
 
@@ -294,19 +294,19 @@ write(int fd, const void *buffer, unsigned size) {
     // otherwise may confused
     putbuf(buffer, size);
     return 0;
+  }
+  if (tidArray[fd-2] != thread_current()->tid) {
+    exit(-1);
+  }
+  if (canBeWritten[fd - 2]) {
+    file_allow_write(fileFdArray[fd - 2].f);
   } else {
-    if (tidArray[fd-2] != thread_current()->tid) {
-      exit(-1);
-    } else {
-      if (!fileStatus[fd - 2]) {
-        file_allow_write(fileFdArray[fd - 2].f);
-      }
-    }
+    file_deny_write(fileFdArray[fd - 2].f);
   }
 
   int return_size = file_write(fileFdArray[fd-2].f, buffer, size);
 
-  file_deny_write(fileFdArray[fd-2].f);
+//  file_deny_write(fileFdArray[fd-2].f);
   return return_size;
 
 }
@@ -333,6 +333,7 @@ close(int fd) {
     exit(-1);
   }
   if (fd<129) {
+    canBeWritten[fd - 2] = true;
     file_close(fileFdArray[fd-2].f);
     fileFdArray[fd-2].f = NULL;
   } else {
