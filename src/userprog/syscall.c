@@ -30,7 +30,7 @@ bool canBeWritten[128];
 int currentFd = 2;
 
 void
-syscall_init (void)
+syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
@@ -271,6 +271,7 @@ read(int fd, void *buffer, unsigned size) {
   }
   if (!safe_access(buffer)) exit(-1);
   if (fd == 0) {
+
     return input_getc();
   }
   canBeWritten[fd-2] = false;
@@ -278,7 +279,10 @@ read(int fd, void *buffer, unsigned size) {
   struct file *currentFile = fileFdArray[fd - 2].f;
 
   if (currentFile != NULL) {
-    return file_read(currentFile, buffer, size);
+    canBeWritten[fd-2] = true;
+    int id = file_read(currentFile, buffer, size);
+
+    return id;
   } else {
     exit(-1);
   }
@@ -295,19 +299,17 @@ write(int fd, const void *buffer, unsigned size) {
     putbuf(buffer, size);
     return 0;
   }
-  if (tidArray[fd-2] != thread_current()->tid) {
+
+  if (tidArray[fd-2] != thread_current()->tid && canBeWritten[fd - 2]) {
     exit(-1);
-  }
-  if (canBeWritten[fd - 2]) {
-    file_allow_write(fileFdArray[fd - 2].f);
   } else {
-    file_deny_write(fileFdArray[fd - 2].f);
+    file_allow_write(fileFdArray[fd - 2].f);
   }
 
-  int return_size = file_write(fileFdArray[fd-2].f, buffer, size);
+  int result = file_write(fileFdArray[fd-2].f, buffer, size);
 
-//  file_deny_write(fileFdArray[fd-2].f);
-  return return_size;
+  file_deny_write(fileFdArray[fd-2].f);
+  return result;
 
 }
 
@@ -327,16 +329,16 @@ void
 close(int fd) {
   // printf(NULL)
   if (fileFdArray[fd-2].f == NULL){
-    exit(-1);
+    return;
   }
   if (tidArray[fd-2] != thread_current()->tid) {
-    exit(-1);
+    return;
   }
   if (fd<129) {
     canBeWritten[fd - 2] = true;
     file_close(fileFdArray[fd-2].f);
     fileFdArray[fd-2].f = NULL;
   } else {
-    exit(-1);
+    return;
   }
 }
