@@ -196,7 +196,9 @@ exec(const char *cmd_line) {
 
 int
 wait(pid_t pid) {
-
+  if (pid>1024) {
+    return -1;
+  }
   for (int i = 0; i< 100; i++){
     if (thread_current()->child_process_tid[i] == pid){
       return -1;
