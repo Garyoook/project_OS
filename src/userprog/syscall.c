@@ -26,7 +26,7 @@ struct fileWithFd{
 
 struct fileWithFd fileFdArray[128];
 tid_t tidArray[128];
-bool fileStatus[128];
+bool canBeWritten[128];
 int currentFd = 2;
 
 void
@@ -230,11 +230,6 @@ remove(const char *file) {
 int
 open(const char *file) {
   // printf(NULL)
-
-
-
-
-
   struct file *file1 = filesys_open(file);
 
   if (strlen(file) == 0 || file1 == NULL) {
@@ -246,7 +241,7 @@ open(const char *file) {
     fileFdArray[currentFd-2].fd = currentFd;
     fileFdArray[currentFd-2].f = file1;
     tidArray[currentFd-2] = thread_current()->tid;
-    fileStatus[currentFd-2] = false;
+    canBeWritten[currentFd-2] = true;
     // will use a size 130 array of file better than create a sturct for it?
   } else {
     return -1;
@@ -279,12 +274,12 @@ read(int fd, void *buffer, unsigned size) {
 
     return input_getc();
   }
-  fileStatus[fd-2] = true;
+  canBeWritten[fd-2] = false;
 
   struct file *currentFile = fileFdArray[fd - 2].f;
 
   if (currentFile != NULL) {
-    fileStatus[fd-2] = false;
+    canBeWritten[fd-2] = true;
     int id = file_read(currentFile, buffer, size);
 
     return id;
@@ -305,7 +300,7 @@ write(int fd, const void *buffer, unsigned size) {
     return 0;
   }
 
-  if (tidArray[fd-2] != thread_current()->tid && !fileStatus[fd - 2]) {
+  if (tidArray[fd-2] != thread_current()->tid && canBeWritten[fd - 2]) {
     exit(-1);
   } else {
     file_allow_write(fileFdArray[fd - 2].f);
@@ -340,7 +335,7 @@ close(int fd) {
     return;
   }
   if (fd<129) {
-    fileStatus[fd-2] = false;
+    canBeWritten[fd - 2] = true;
     file_close(fileFdArray[fd-2].f);
     fileFdArray[fd-2].f = NULL;
   } else {

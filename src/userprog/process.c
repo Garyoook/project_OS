@@ -74,6 +74,8 @@ static bool argument_passing(void **esp, char *file_name) {
 
 
 // push arguments to the stack;
+  enum intr_level old_level;
+  old_level = intr_disable();
   size_t cmdLen = strlen(file_name);
   char s[cmdLen];
   strlcpy(s, file_name, (cmdLen + 1));
@@ -106,8 +108,6 @@ static bool argument_passing(void **esp, char *file_name) {
     check_stack_overflow(bytes_used);
     addrArr[i] = *esp;
   }
-
-  // note that we have got the argc;
 
   // Aligning the esp to a nearest multiple of 4 DID NOT IMPLEMENT#
   void *addr = (void *) ROUND_DOWN ((uint64_t) *esp , 4);
@@ -148,6 +148,8 @@ static bool argument_passing(void **esp, char *file_name) {
   memcpy (*esp, &nullPtr, sizeof (void *));
   bytes_used += sizeof(void *);
   check_stack_overflow(bytes_used);
+
+  intr_set_level(old_level);
 
   return true;
 
