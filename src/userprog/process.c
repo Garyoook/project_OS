@@ -24,6 +24,8 @@ static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
 
+#define FILE_NAME_LEN_LIMIT 15
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -31,7 +33,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name)
 {
-  char *fn_copy;
+char *fn_copy;
   tid_t tid;
 
   /* Make a copy of FILE_NAME.
@@ -42,11 +44,12 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Create a new thread to execute FILE_NAME. */
-  char command_name[300];
-  char file_name_copy[300];
+  char command_name[FILE_NAME_LEN_LIMIT];
+  char file_name_copy[FILE_NAME_LEN_LIMIT];
   char *save_ptr;
-  strlcpy(file_name_copy, file_name, 200);
-  strlcpy(command_name, strtok_r((char *) file_name_copy, " ", &save_ptr), 200);
+  strlcpy(file_name_copy, file_name, FILE_NAME_LEN_LIMIT);
+  strlcpy(command_name, strtok_r((char *) file_name_copy, " ", &save_ptr), FILE_NAME_LEN_LIMIT);
+
 
   struct file *file = filesys_open(command_name);
   if (file == NULL) {
@@ -56,7 +59,7 @@ process_execute (const char *file_name)
 
   tid = thread_create (command_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+    palloc_free_page (fn_copy);
   return tid;
 }
 
@@ -67,27 +70,33 @@ static void check_stack_overflow(int used);
 
 // use this to pass and push the arguments to the stack:
 static bool argument_passing(void **esp, char *file_name) {
+
+
+
 // push arguments to the stack;
   size_t cmdLen = strlen(file_name);
   char s[cmdLen];
   strlcpy(s, file_name, (cmdLen + 1));
 
+
   // keep checking this to ensure the arguments do not exceed a single page;
   int bytes_used = 0;
 
   char *token, *save_ptr;
+  int argc= 0;
 
-  int j = 0;
-  int argc = get_argc(file_name);
-  char *argArr[argc];
-  void *addrArr[argc];
+  char *argArr[64];
+  void *addrArr[64];
   void *addr_argv;
+
 
   for (token = strtok_r (s, " ", &save_ptr); token != NULL;
        token = strtok_r (NULL, " ", &save_ptr)) {
-    argArr[j] = token;
-    j++;
+    argArr[argc] = token;
+    argc++;
   }
+
+
 
   // push the arguments to the stack;
   for (int i = argc - 1; i >= 0; i--) {
@@ -513,12 +522,13 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
 }
 
 static int get_argc(char *name) {
+  size_t cmdLen = strlen(name);
+  char temp[cmdLen];
+  strlcpy(temp, name, (cmdLen + 1));
   int argc = 0;
   char *token, *save_ptr;
-  size_t cmdLen = strlen(name);
-  char s[cmdLen];
-  strlcpy(s, name, (cmdLen + 1));
-  for (token = strtok_r (s, " ", &save_ptr); token != NULL;
+
+  for (token = strtok_r (temp, " ", &save_ptr); token != NULL;
        token = strtok_r (NULL, " ", &save_ptr)) {
     argc++;
   }

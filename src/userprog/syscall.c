@@ -25,6 +25,8 @@ struct fileWithFd{
 };
 
 struct fileWithFd fileFdArray[128];
+tid_t tidArray[128];
+bool fileStatus[128];
 int currentFd = 2;
 
 void
@@ -81,18 +83,16 @@ syscall_handler (struct intr_frame *f UNUSED)
   switch (syscall_num) {
 
     case SYS_EXEC:
-//      check_esp(fst);
-//      check_esp(*(char **)fst);
+      if (!safe_access(fst)) exit(-1);
       f->eax = (uint32_t) exec(*(char **)fst);
       break;
     case SYS_CLOSE:
-//      check_esp(fst);
-      close((int)fst);
+      if (!safe_access(fst)) exit(-1);
+      close(*(int *)fst);
       break;
     case SYS_CREATE:
-//      check_esp(fst);
-//      check_esp(*(char **)fst);
-//      check_esp(snd);
+      if (!safe_access(fst)) exit(-1);
+      if (!safe_access(snd)) exit(-1);
       f->eax = (uint32_t) create(*(char **)fst, (void *)*(int *)snd);
       break;
     case SYS_EXIT:
@@ -101,7 +101,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       exit(*(int*)fst);
       break;
     case SYS_FILESIZE:
-//      check_esp(fst);
+      if (!safe_access(fst)) exit(-1);
       f->eax = (uint32_t) filesize(*(int *) fst);
       break;
     case SYS_HALT:
@@ -112,36 +112,34 @@ syscall_handler (struct intr_frame *f UNUSED)
       f->eax = (uint32_t) open(*(char **)fst);
       break;
     case SYS_READ:
-//      check_esp(fst);
-//      check_esp(snd);
-//      check_esp(*snd);
-//      check_esp(trd);
+      if (!safe_access(fst)) exit(-1);
+      if (!safe_access(snd)) exit(-1);
+      if (!safe_access(trd)) exit(-1);
       f->eax = (uint32_t) read(*(int *)fst, *snd, *(unsigned *) trd);
       break;
     case SYS_WRITE:
-//      check_esp(fst);
-//      check_esp(snd);
-//      check_esp(*snd);
-//      check_esp(trd);
+      if (!safe_access(fst)) exit(-1);
+      if (!safe_access(snd)) exit(-1);
+      if (!safe_access(trd)) exit(-1);
       f->eax = (uint32_t) write(*(int *)fst, *snd, *(unsigned *) trd);
       break;
     case SYS_WAIT:
-//      check_esp(fst);
+      if (!safe_access(fst)) exit(-1);
       f->eax = (uint32_t) wait(*(pid_t *)fst);
       break;
     case SYS_REMOVE:
-//      check_esp(fst);
+      if (!safe_access(fst)) exit(-1);
       if (!safe_access(*(char **)fst)) exit(-1);
 
       f->eax = (uint32_t) remove(*(const char **) fst);
       break;
     case SYS_SEEK:
-//      check_esp(fst);
-//      check_esp(snd);
+      if (!safe_access(fst)) exit(-1);
+      if (!safe_access(snd)) exit(-1);
       seek(*(int *) fst, *(unsigned int *) snd);
       break;
     case SYS_TELL:
-//      check_esp(fst);
+      if (!safe_access(fst)) exit(-1);
       f->eax = tell(*(int *) fst);
       break;
     default:break;
@@ -242,16 +240,23 @@ open(const char *file) {
     currentFd++;
     fileFdArray[currentFd-2].fd = currentFd;
     fileFdArray[currentFd-2].f = file1;
+    tidArray[currentFd-2] = thread_current()->tid;
+    fileStatus[currentFd-2] = false;
     // will use a size 130 array of file better than create a sturct for it?
   } else {
     return -1;
   }
+
+  file_deny_write(file1);
   return currentFd;
 }
 
 int
 filesize(int fd) {
   // printf(NULL)
+  if (fileFdArray[fd-2].f == NULL) {
+    exit(-1);
+  }
   return file_length(fileFdArray[fd-2].f);
 }
 
@@ -261,12 +266,17 @@ read(int fd, void *buffer, unsigned size) {
   if (fd<1 || fd>130) {
     exit(-1);
   }
+  if (tidArray[fd-2] != thread_current()->tid) {
+    exit(-1);
+  }
   if (!safe_access(buffer)) exit(-1);
   if (fd == 0) {
     return input_getc();
   }
+  fileStatus[fd-2] = true;
 
-  struct file *currentFile = fileFdArray[fd-2].f;
+  struct file *currentFile = fileFdArray[fd - 2].f;
+
   if (currentFile != NULL) {
     return file_read(currentFile, buffer, size);
   } else {
@@ -279,16 +289,25 @@ write(int fd, const void *buffer, unsigned size) {
   if (fd<1 || fd>130) {
     exit(-1);
   }
-  if (!safe_access(buffer)) exit(-1);
   if (fd == 1) {
     // size may not bigger than hundred bytes
     // otherwise may confused
     putbuf(buffer, size);
     return 0;
+  } else {
+    if (tidArray[fd-2] != thread_current()->tid) {
+      exit(-1);
+    } else {
+      if (!fileStatus[fd - 2]) {
+        file_allow_write(fileFdArray[fd - 2].f);
+      }
+    }
   }
 
-  printf("fd:%d", fd);
-  return file_write(fileFdArray[fd-2].f, buffer, size);
+  int return_size = file_write(fileFdArray[fd-2].f, buffer, size);
+
+  file_deny_write(fileFdArray[fd-2].f);
+  return return_size;
 
 }
 
@@ -306,10 +325,17 @@ tell(int fd) {
 
 void
 close(int fd) {
-//  // printf(NULL)
-
-  printf("close fd:%d", fd);
-//  if (fd<129) {
-//    file_close(fileFdArray[fd-2].f);
-//  }
+  // printf(NULL)
+  if (fileFdArray[fd-2].f == NULL){
+    exit(-1);
+  }
+  if (tidArray[fd-2] != thread_current()->tid) {
+    exit(-1);
+  }
+  if (fd<129) {
+    file_close(fileFdArray[fd-2].f);
+    fileFdArray[fd-2].f = NULL;
+  } else {
+    exit(-1);
+  }
 }
