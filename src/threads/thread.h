@@ -90,8 +90,9 @@ typedef int tid_t;
 
 #define MAX_LEVEL 8+1  /*Max level of donation*/
 
+#define CHILD_P_NUM 64
 struct thread
-  {
+{
     /* Owned by thread.c. */
     tid_t tid;                          /* Thread identifier. */
     enum thread_status status;          /* Thread state. */
@@ -110,42 +111,23 @@ struct thread
     int currentPos;                     /* current position of array priorities;*/
     struct thread *donateTo;            /* A pointer to record the thread that this thread donate to*/
 
-
-
   // for BSD:
     int nice;
     fp recent_cpu;
 
-  // user prog;
-    struct list locks;
-    struct thread *parent;
-    struct list child_process;
-    struct list_elem child_elem;
-    int child_process_tid[100];
-    int child_process_exit_status[100];
-    int child_pos;
-    int count;
-    bool isKernel;
-
-    bool wait;
-
-
-
 #ifdef USERPROG
-    /* Owned by userprog/process.c. */
-    uint32_t *pagedir;                  /* Page directory. */
-  struct semaphore *waiting_child_sema;
-  struct list file_list;
-  struct list_elem file_elem;
-  tid_t parent_tid;
+  /* Owned by userprog/process.c. */
+  uint32_t *pagedir;                  /* Page directory. */
+  struct list locks;
+  struct thread *parent;
+  int child_process_tid[CHILD_P_NUM];
+  int child_process_exit_status[CHILD_P_NUM];
+  int child_pos;
+  int count;
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
-};
-
-struct threadWithItsChainOfPriority{
-
 };
 
 /* If false (default), use round-robin scheduler.

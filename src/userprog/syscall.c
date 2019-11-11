@@ -14,6 +14,9 @@
 #include "threads/synch.h"
 #include "devices/input.h"
 
+#define FILE_LIMIT 128
+#define STD_IO 2
+
 static void syscall_handler (struct intr_frame *);
 
 bool safe_access(void const *esp);
@@ -24,10 +27,10 @@ struct fileWithFd{
     struct file *f;
 };
 
-struct fileWithFd fileFdArray[128];
-tid_t tidArray[128];
-bool canBeWritten[128];
-int currentFd = 2;
+struct fileWithFd fileFdArray[FILE_LIMIT];
+tid_t tidArray[FILE_LIMIT];
+bool canBeWritten[FILE_LIMIT];
+int currentFd = STD_IO;
 
 void
 syscall_init (void) 
@@ -41,10 +44,6 @@ bool safe_access(void const *esp) {
     pagedir_get_page(thread_current()->pagedir, esp) &&
     esp != NULL);
 
-}
-
-bool ptr_invalid(const void *ptr) {
-  return (!is_user_vaddr(ptr) || ptr == NULL);
 }
 
 void release_all_locks(struct thread *t){
@@ -64,7 +63,7 @@ static void
 syscall_handler (struct intr_frame *f UNUSED)
 {
   // check esp is valid:
-  if (!safe_access(f->esp)) exit(-1);
+  if (!safe_access(f->esp)) exit(EXIT_FAIL);
 
   // for user access memory:
   struct thread *t = thread_current();
@@ -76,70 +75,71 @@ syscall_handler (struct intr_frame *f UNUSED)
   int syscall_num;
   syscall_num = *(int *)f->esp;
 
+  // get all 3 possible arguments
+  // would'nt affect anything if it is not argument.
   void **fst = (void **)(f->esp) + 1;
   void **snd = (void **)(f->esp) + 2;
   void **trd = (void **)(f->esp) + 3;
 
   switch (syscall_num) {
-
     case SYS_EXEC:
-      if (!safe_access(fst)) exit(-1);
+      if (!safe_access(fst)) exit(EXIT_FAIL);
       f->eax = (uint32_t) exec(*(char **)fst);
       break;
     case SYS_CLOSE:
-      if (!safe_access(fst)) exit(-1);
+      if (!safe_access(fst)) exit(EXIT_FAIL);
       close(*(int *)fst);
       break;
     case SYS_CREATE:
-      if (!safe_access(fst)) exit(-1);
-      if (!safe_access(snd)) exit(-1);
+      if (!safe_access(fst)) exit(EXIT_FAIL);
+      if (!safe_access(snd)) exit(EXIT_FAIL);
       f->eax = (uint32_t) create(*(char **)fst, (void *)*(int *)snd);
       break;
     case SYS_EXIT:
 
-      if (!safe_access(fst)) exit(-1);//must check it here to pass sc-bad-arg
+      if (!safe_access(fst)) exit(EXIT_FAIL);//must check it here to pass sc-bad-arg
       exit(*(int*)fst);
       break;
     case SYS_FILESIZE:
-      if (!safe_access(fst)) exit(-1);
+      if (!safe_access(fst)) exit(EXIT_FAIL);
       f->eax = (uint32_t) filesize(*(int *) fst);
       break;
     case SYS_HALT:
       halt();
     case SYS_OPEN:
-      if (!safe_access(fst)) exit(-1);
-      if (!safe_access(*(char **)fst)) exit(-1);
+      if (!safe_access(fst)) exit(EXIT_FAIL);
+      if (!safe_access(*(char **)fst)) exit(EXIT_FAIL);
       f->eax = (uint32_t) open(*(char **)fst);
       break;
     case SYS_READ:
-      if (!safe_access(fst)) exit(-1);
-      if (!safe_access(snd)) exit(-1);
-      if (!safe_access(trd)) exit(-1);
+      if (!safe_access(fst)) exit(EXIT_FAIL);
+      if (!safe_access(snd)) exit(EXIT_FAIL);
+      if (!safe_access(trd)) exit(EXIT_FAIL);
       f->eax = (uint32_t) read(*(int *)fst, *snd, *(unsigned *) trd);
       break;
     case SYS_WRITE:
-      if (!safe_access(fst)) exit(-1);
-      if (!safe_access(snd)) exit(-1);
-      if (!safe_access(trd)) exit(-1);
+      if (!safe_access(fst)) exit(EXIT_FAIL);
+      if (!safe_access(snd)) exit(EXIT_FAIL);
+      if (!safe_access(trd)) exit(EXIT_FAIL);
       f->eax = (uint32_t) write(*(int *)fst, *snd, *(unsigned *) trd);
       break;
     case SYS_WAIT:
-      if (!safe_access(fst)) exit(-1);
+      if (!safe_access(fst)) exit(EXIT_FAIL);
       f->eax = (uint32_t) wait(*(pid_t *)fst);
       break;
     case SYS_REMOVE:
-      if (!safe_access(fst)) exit(-1);
-      if (!safe_access(*(char **)fst)) exit(-1);
+      if (!safe_access(fst)) exit(EXIT_FAIL);
+      if (!safe_access(*(char **)fst)) exit(EXIT_FAIL);
 
       f->eax = (uint32_t) remove(*(const char **) fst);
       break;
     case SYS_SEEK:
-      if (!safe_access(fst)) exit(-1);
-      if (!safe_access(snd)) exit(-1);
+      if (!safe_access(fst)) exit(EXIT_FAIL);
+      if (!safe_access(snd)) exit(EXIT_FAIL);
       seek(*(int *) fst, *(unsigned int *) snd);
       break;
     case SYS_TELL:
-      if (!safe_access(fst)) exit(-1);
+      if (!safe_access(fst)) exit(EXIT_FAIL);
       f->eax = tell(*(int *) fst);
       break;
     default:break;
@@ -148,12 +148,14 @@ syscall_handler (struct intr_frame *f UNUSED)
 
 void
 halt(void) {
-  // printf(NULL)
   shutdown_power_off();
 }
 
 void
 exit (int status) {
+  enum intr_level old_level;
+  old_level = intr_disable();
+
   struct thread *cur = thread_current();
   printf("%s: exit(%d)\n", cur->name, status);
   struct thread *parent = thread_current()->parent;
@@ -164,12 +166,8 @@ exit (int status) {
     parent->count--;
     thread_unblock(cur->parent);
   }
-//  if (parent != NULL){
-//  for (int i = 0; i < 100; i++){
-//    if (parent->child_process_tid[i] == thread_current()->tid){
-//      printf("cadsfsadfdsafdsaf  %d", parent->child_process_exit_status[i]);
-//    }}
-//  }
+
+  intr_set_level(old_level);
 
   thread_exit();
 }
@@ -177,32 +175,27 @@ exit (int status) {
 pid_t
 exec(const char *cmd_line) {
   if (!safe_access(cmd_line)) {
-    return -1;
+    return EXIT_FAIL;
   }
 
   pid_t pid = process_execute(cmd_line);
-
-//  if (pid == TID_ERROR) {
-//    pid = -1;
-//  }
-//
-//  if(wait(tid) != -1) {
-//    return tid;
-//  }
   return pid;
 }
 
 int
 wait(pid_t pid) {
-  for (int i = 0; i< 100; i++){
+  enum intr_level old_level;
+  old_level = intr_disable();
+
+  for (int i = 0; i< CHILD_P_NUM; i++){
     if (thread_current()->child_process_tid[i] == pid){
-      return -1;
+      return EXIT_FAIL;
     }
   }
-
-
   struct thread *t = lookup_tid(pid);
   int result = process_wait(pid);
+
+  intr_set_level(old_level);
 
   return result;
 
@@ -210,41 +203,37 @@ wait(pid_t pid) {
 
 bool
 create(const char *file, unsigned initial_size) {
-  // printf(NULL)
   if (strnlen(file, 15) > 14) {
     return false;
   }
   if (initial_size >= 0 && *file != '\0') {
     return filesys_create(file, initial_size);
   } else {
-    exit(-1);
+    exit(EXIT_FAIL);
   }
 }
 
 bool
 remove(const char *file) {
-  // printf(NULL)
   return filesys_remove(file);
 }
 
 int
 open(const char *file) {
-  // printf(NULL)
   struct file *file1 = filesys_open(file);
 
   if (strlen(file) == 0 || file1 == NULL) {
-    return -1;
+    return EXIT_FAIL;
   }
 
-  if (currentFd<129) {
+  if (currentFd <= FILE_LIMIT) {
     currentFd++;
-    fileFdArray[currentFd-2].fd = currentFd;
-    fileFdArray[currentFd-2].f = file1;
-    tidArray[currentFd-2] = thread_current()->tid;
-    canBeWritten[currentFd-2] = true;
-    // will use a size 130 array of file better than create a sturct for it?
+    fileFdArray[currentFd-STD_IO].fd = currentFd;
+    fileFdArray[currentFd-STD_IO].f = file1;
+    tidArray[currentFd-STD_IO] = thread_current()->tid;
+    canBeWritten[currentFd-STD_IO] = true;
   } else {
-    return -1;
+    return EXIT_FAIL;
   }
 
   file_deny_write(file1);
@@ -253,45 +242,41 @@ open(const char *file) {
 
 int
 filesize(int fd) {
-  // printf(NULL)
-  if (fileFdArray[fd-2].f == NULL) {
-    exit(-1);
+  if (fileFdArray[fd-STD_IO].f == NULL) {
+    exit(EXIT_FAIL);
   }
-  return file_length(fileFdArray[fd-2].f);
+  return file_length(fileFdArray[fd-STD_IO].f);
 }
 
 int
 read(int fd, void *buffer, unsigned size) {
-  // printf(NULL)
-  if (fd<1 || fd>130) {
-    exit(-1);
+  if (fd < 1 || fd > FILE_LIMIT) {
+    exit(EXIT_FAIL);
   }
-  if (tidArray[fd-2] != thread_current()->tid) {
-    exit(-1);
+  if (tidArray[fd-STD_IO] != thread_current()->tid) {
+    exit(EXIT_FAIL);
   }
-  if (!safe_access(buffer)) exit(-1);
+  if (!safe_access(buffer)) exit(EXIT_FAIL);
   if (fd == 0) {
-
     return input_getc();
   }
-  canBeWritten[fd-2] = false;
+  canBeWritten[fd-STD_IO] = false;
 
-  struct file *currentFile = fileFdArray[fd - 2].f;
+  struct file *currentFile = fileFdArray[fd-STD_IO].f;
 
   if (currentFile != NULL) {
-    canBeWritten[fd-2] = true;
+    canBeWritten[fd-STD_IO] = true;
     int id = file_read(currentFile, buffer, size);
-
     return id;
   } else {
-    exit(-1);
+    exit(EXIT_FAIL);
   }
 }
 
 int
 write(int fd, const void *buffer, unsigned size) {
-  if (fd<1 || fd>130) {
-    exit(-1);
+  if (fd < 1 || fd > FILE_LIMIT) {
+    exit(EXIT_FAIL);
   }
   if (fd == 1) {
     // size may not bigger than hundred bytes
@@ -300,44 +285,40 @@ write(int fd, const void *buffer, unsigned size) {
     return 0;
   }
 
-  if (tidArray[fd-2] != thread_current()->tid && canBeWritten[fd - 2]) {
-    exit(-1);
+  if (tidArray[fd-STD_IO] != thread_current()->tid && canBeWritten[fd-STD_IO]) {
+    exit(EXIT_FAIL);
   } else {
-    file_allow_write(fileFdArray[fd - 2].f);
+    file_allow_write(fileFdArray[fd-STD_IO].f);
   }
 
-  int result = file_write(fileFdArray[fd-2].f, buffer, size);
+  int result = file_write(fileFdArray[fd-STD_IO].f, buffer, size);
 
-  file_deny_write(fileFdArray[fd-2].f);
+  file_deny_write(fileFdArray[fd-STD_IO].f);
   return result;
-
 }
 
 void
 seek(int fd, unsigned position) {
-  // printf(NULL)
-  file_seek(fileFdArray[fd-2].f, position);
+  file_seek(fileFdArray[fd-STD_IO].f, position);
 }
 
 unsigned
 tell(int fd) {
-  // printf(NULL)
-  return (unsigned int) file_tell(fileFdArray[fd - 2].f);
+  return (unsigned int) file_tell(fileFdArray[fd-STD_IO].f);
 }
 
 void
 close(int fd) {
-  // printf(NULL)
-  if (fileFdArray[fd-2].f == NULL){
+  if (fileFdArray[fd-STD_IO].f == NULL){
     return;
   }
-  if (tidArray[fd-2] != thread_current()->tid) {
+  if (tidArray[fd-STD_IO] != thread_current()->tid) {
     return;
   }
-  if (fd<129) {
-    canBeWritten[fd - 2] = true;
-    file_close(fileFdArray[fd-2].f);
-    fileFdArray[fd-2].f = NULL;
+  if (fd <= FILE_LIMIT) {
+    canBeWritten[fd-STD_IO] = true;
+    file_close(fileFdArray[fd-STD_IO].f);
+    fileFdArray[fd-STD_IO].f = NULL;
   } else {
     return;
   }

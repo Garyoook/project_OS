@@ -428,22 +428,6 @@ thread_get_recent_cpu (void)
   return 0;
 }
 
-/* Get the thread by its tid */
-struct thread
-*thread_get_by_id (tid_t id)
-{
-  ASSERT (id != TID_ERROR);
-  struct list_elem *e;
-  struct thread *t;
-  e = list_tail (&all_list);
-  while ((e = list_prev (e)) != list_head (&all_list))
-  {
-    t = list_entry (e, struct thread, allelem);
-    if (t->tid == id && t->status != THREAD_DYING)
-      return t;
-  }
-  return NULL;
-}
 /* Idle thread.  Executes when no other thread is ready to run.
 
    The idle thread is initially put on the ready list by
@@ -532,14 +516,15 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
 
+#ifdef USERPROG
   t->parent = NULL;
-  t->wait = false;
   t->count = 0;
   for (int i = 0; i < 100; i++){
     t->child_process_exit_status[i] = -1;
     t->child_process_tid[i] = -1;
   }
   t->child_pos = 0;
+#endif
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

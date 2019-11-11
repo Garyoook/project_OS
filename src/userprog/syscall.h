@@ -1,6 +1,8 @@
 #ifndef USERPROG_SYSCALL_H
 #define USERPROG_SYSCALL_H
 
+#define EXIT_FAIL -1
+
 #include <user/syscall.h>
 #include "threads/thread.h"
 
