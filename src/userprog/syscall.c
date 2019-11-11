@@ -196,9 +196,6 @@ exec(const char *cmd_line) {
 
 int
 wait(pid_t pid) {
-  if (pid>1024) {
-    return -1;
-  }
   for (int i = 0; i< 100; i++){
     if (thread_current()->child_process_tid[i] == pid){
       return -1;
@@ -271,8 +268,7 @@ read(int fd, void *buffer, unsigned size) {
 
   struct file *currentFile = fileFdArray[fd-2].f;
   if (currentFile != NULL) {
-    int current = file_tell(currentFile);
-    return file_read_at(currentFile, buffer, size, current);
+    return file_read(currentFile, buffer, size);
   } else {
     exit(-1);
   }
@@ -291,9 +287,7 @@ write(int fd, const void *buffer, unsigned size) {
     return 0;
   }
 
-  struct file *currentFile = fileFdArray[fd-2].f;
-  int current = file_tell(currentFile);
-  return file_write_at(currentFile, buffer, size, current);
+  return file_write(fileFdArray[fd-2].f, buffer, size);
 
 }
 
