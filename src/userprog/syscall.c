@@ -257,14 +257,14 @@ filesize(int fd) {
 
 int
 read(int fd, void *buffer, unsigned size) {
-  if (fd < 1 || fd > FILE_LIMIT) {
+  if (fd < STDOUT_FILENO || fd > FILE_LIMIT) {
     exit(EXIT_FAIL);
   }
   if (tidArray[fd-STD_IO] != thread_current()->tid) {
     exit(EXIT_FAIL);
   }
   if (!safe_access(buffer)) exit(EXIT_FAIL);
-  if (fd == 0) {
+  if (fd == STDIN_FILENO) {
     return input_getc();
   }
 //  canBeWritten[fd-STD_IO] = false;
@@ -282,10 +282,10 @@ read(int fd, void *buffer, unsigned size) {
 
 int
 write(int fd, const void *buffer, unsigned size) {
-  if (fd < 1 || fd > FILE_LIMIT) {
+  if (fd < STDOUT_FILENO|| fd > FILE_LIMIT) {
     exit(EXIT_FAIL);
   }
-  if (fd == 1) {
+  if (fd == STDOUT_FILENO) {
     // size may not bigger than hundred bytes
     // otherwise may confused
     putbuf(buffer, size);

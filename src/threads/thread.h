@@ -7,6 +7,9 @@
 #include "fixed-point.h"
 #include "synch.h"
 
+
+#define CHILD_P_NUM 64
+
 /* List of all threads that are blocked. */
 struct list blocked_list;
 
@@ -92,41 +95,37 @@ typedef int tid_t;
 
 struct thread
 {
-    /* Owned by thread.c. */
-    tid_t tid;                          /* Thread identifier. */
-    enum thread_status status;          /* Thread state. */
-    char name[16];                      /* Name (for debugging purposes). */
-    uint8_t *stack;                     /* Saved stack pointer. */
-    int priority;                       /* Priority. */
-    int64_t blocked_ticks;              /* If the thread is blocked, it will be unblock after blocked ticks. */
-    struct list_elem allelem;           /* List element for all threads list. */
+  /* Owned by thread.c. */
+  tid_t tid;                          /* Thread identifier. */
+  enum thread_status status;          /* Thread state. */
+  char name[16];                      /* Name (for debugging purposes). */
+  uint8_t *stack;                     /* Saved stack pointer. */
+  int priority;                       /* Priority. */
+  int64_t blocked_ticks;              /* If the thread is blocked, it will be unblock after blocked ticks. */
+  struct list_elem allelem;           /* List element for all threads list. */
 
-    /* Shared between thread.c and synch.c. */
-    struct list_elem elem;              /* List element. */
+  /* Shared between thread.c and synch.c. */
+  struct list_elem elem;              /* List element. */
 
-    // self defined:
-    // for priority donation:
-    int priorities[MAX_LEVEL];          /* An array of int to store priorities that this thread get donated*/
-    int currentPos;                     /* current position of array priorities;*/
-    struct thread *donateTo;            /* A pointer to record the thread that this thread donate to*/
-
-    // for BSD:
-    int nice;
-    fp recent_cpu;
-
-    // user prog;
-    struct list locks;
-    struct thread *parent;
-    int child_process_tid[100];
-    int child_process_exit_status[100];
-    int child_pos;
-    int count;
-
-
+  // self defined:
+  // for priority donation:
+  int priorities[MAX_LEVEL];          /* An array of int to store priorities that this thread get donated*/
+  int currentPos;                     /* current position of array priorities;*/
+  struct thread *donateTo;            /* A pointer to record the thread that this thread donate to*/
+   // for BSD:
+   int nice;
+   fp recent_cpu;
 
 #ifdef USERPROG
-    /* Owned by userprog/process.c. */
-    uint32_t *pagedir;                  /* Page directory. */
+  /* Owned by userprog/process.c. */
+  uint32_t *pagedir;                  /* Page directory. */
+  // user prog;
+  struct list locks;
+  struct thread *parent;
+  int child_process_tid[CHILD_P_NUM];
+  int child_process_exit_status[CHILD_P_NUM];
+  int child_pos;
+  int count;
 #endif
 
     /* Owned by thread.c. */
