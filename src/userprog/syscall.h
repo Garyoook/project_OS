@@ -6,6 +6,8 @@
 #include <user/syscall.h>
 #include "threads/thread.h"
 
+char *current_file_name;
+
 void syscall_init (void);
 
 void halt (void);

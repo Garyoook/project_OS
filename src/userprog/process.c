@@ -12,6 +12,7 @@
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "syscall.h"
@@ -60,7 +61,8 @@ static void check_stack_overflow(int used);
 
 // use this to pass and push the arguments to the stack:
 static bool argument_passing(void **esp, char *file_name) {
-
+current_file_name = malloc(strlen(file_name) + 1);
+strlcpy(current_file_name, file_name, strlen(file_name) + 1);
 // push arguments to the stack;
   enum intr_level old_level;
   old_level = intr_disable();

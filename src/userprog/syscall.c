@@ -13,6 +13,7 @@
 #include "pagedir.h"
 #include "threads/synch.h"
 #include "devices/input.h"
+#include "threads/malloc.h"
 
 #define FILE_LIMIT 128
 #define STD_IO 2
@@ -29,7 +30,8 @@ struct fileWithFd{
 
 struct fileWithFd fileFdArray[FILE_LIMIT];
 tid_t tidArray[FILE_LIMIT];
-bool canBeWritten[FILE_LIMIT];
+//bool canBeWritten[FILE_LIMIT];
+bool reopen[FILE_LIMIT];
 int currentFd = STD_IO;
 
 void
@@ -220,7 +222,11 @@ remove(const char *file) {
 
 int
 open(const char *file) {
+  bool reopened = false;
   struct file *file1 = filesys_open(file);
+  if (!strcmp(file, current_file_name)) {
+    reopened = true;
+  }
 
   if (strlen(file) == 0 || file1 == NULL) {
     return EXIT_FAIL;
@@ -231,7 +237,8 @@ open(const char *file) {
     fileFdArray[currentFd-STD_IO].fd = currentFd;
     fileFdArray[currentFd-STD_IO].f = file1;
     tidArray[currentFd-STD_IO] = thread_current()->tid;
-    canBeWritten[currentFd-STD_IO] = true;
+    reopen[currentFd-STD_IO] = reopened;
+//    canBeWritten[currentFd-STD_IO] = true;
   } else {
     return EXIT_FAIL;
   }
@@ -260,12 +267,12 @@ read(int fd, void *buffer, unsigned size) {
   if (fd == 0) {
     return input_getc();
   }
-  canBeWritten[fd-STD_IO] = false;
+//  canBeWritten[fd-STD_IO] = false;
 
   struct file *currentFile = fileFdArray[fd-STD_IO].f;
 
   if (currentFile != NULL) {
-    canBeWritten[fd-STD_IO] = true;
+//    canBeWritten[fd-STD_IO] = true;
     int id = file_read(currentFile, buffer, size);
     return id;
   } else {
@@ -285,8 +292,8 @@ write(int fd, const void *buffer, unsigned size) {
     return 0;
   }
 
-  if (tidArray[fd-STD_IO] != thread_current()->tid && canBeWritten[fd-STD_IO]) {
-    exit(EXIT_FAIL);
+  if (tidArray[fd-STD_IO] != thread_current()->tid || reopen[fd-STD_IO]) {
+//    exit(EXIT_FAIL);
   } else {
     file_allow_write(fileFdArray[fd-STD_IO].f);
   }
@@ -316,7 +323,7 @@ close(int fd) {
     return;
   }
   if (fd <= FILE_LIMIT) {
-    canBeWritten[fd-STD_IO] = true;
+//    canBeWritten[fd-STD_IO] = true;
     file_close(fileFdArray[fd-STD_IO].f);
     fileFdArray[fd-STD_IO].f = NULL;
   } else {
