@@ -7,6 +7,8 @@
 #define ARGC 16
 #define FILE_NAME_LEN_LIMIT 15
 
+#define CHILD_P_NUM 64
+
 tid_t process_execute (const char *file_name);
 int process_wait (tid_t);
 void process_exit (void);

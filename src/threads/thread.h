@@ -12,12 +12,12 @@ struct list blocked_list;
 
 /* States in a thread's life cycle. */
 enum thread_status
-  {
+{
     THREAD_RUNNING,     /* Running thread. */
     THREAD_READY,       /* Not running but ready to run. */
     THREAD_BLOCKED,     /* Waiting for an event to trigger. */
     THREAD_DYING        /* About to be destroyed. */
-  };
+};
 
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
@@ -90,7 +90,6 @@ typedef int tid_t;
 
 #define MAX_LEVEL 8+1  /*Max level of donation*/
 
-#define CHILD_P_NUM 64
 struct thread
 {
     /* Owned by thread.c. */
@@ -102,33 +101,38 @@ struct thread
     int64_t blocked_ticks;              /* If the thread is blocked, it will be unblock after blocked ticks. */
     struct list_elem allelem;           /* List element for all threads list. */
 
-  /* Shared between thread.c and synch.c. */
-  struct list_elem elem;              /* List element. */
+    /* Shared between thread.c and synch.c. */
+    struct list_elem elem;              /* List element. */
 
-  // self defined:
-  // for priority donation:
+    // self defined:
+    // for priority donation:
     int priorities[MAX_LEVEL];          /* An array of int to store priorities that this thread get donated*/
     int currentPos;                     /* current position of array priorities;*/
     struct thread *donateTo;            /* A pointer to record the thread that this thread donate to*/
 
-  // for BSD:
+    // for BSD:
     int nice;
     fp recent_cpu;
 
+    // user prog;
+    struct list locks;
+    struct thread *parent;
+    int child_process_tid[100];
+    int child_process_exit_status[100];
+    int child_pos;
+    int count;
+
+
+
 #ifdef USERPROG
-  /* Owned by userprog/process.c. */
-  uint32_t *pagedir;                  /* Page directory. */
-  struct list locks;
-  struct thread *parent;
-  int child_process_tid[CHILD_P_NUM];
-  int child_process_exit_status[CHILD_P_NUM];
-  int child_pos;
-  int count;
+    /* Owned by userprog/process.c. */
+    uint32_t *pagedir;                  /* Page directory. */
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
 };
+
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

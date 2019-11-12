@@ -33,7 +33,7 @@ bool canBeWritten[FILE_LIMIT];
 int currentFd = STD_IO;
 
 void
-syscall_init (void) 
+syscall_init (void)
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
