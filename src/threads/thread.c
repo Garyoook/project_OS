@@ -524,6 +524,7 @@ init_thread (struct thread *t, const char *name, int priority)
     t->child_process_tid[i] = -1;
   }
   t->child_pos = 0;
+  sema_init(&t->sema, 0);
 #endif
 
   old_level = intr_disable ();

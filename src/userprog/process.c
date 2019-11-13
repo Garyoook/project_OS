@@ -215,7 +215,7 @@ process_wait (tid_t child_tid)
 
   enum intr_level old_level;
   old_level = intr_disable();
-  thread_block();
+  sema_down(&cur->sema);
   intr_set_level(old_level);
 
   for (int i = 0; i < CHILD_P_NUM; i++){

@@ -166,7 +166,7 @@ exit (int status) {
     parent->child_process_exit_status[parent->child_pos] = status;
     parent->child_pos++;
     parent->count--;
-    thread_unblock(cur->parent);
+    sema_up(&cur->parent->sema);
   }
 
   intr_set_level(old_level);

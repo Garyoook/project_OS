@@ -115,13 +115,15 @@ struct thread
     int nice;
     fp recent_cpu;
 
-    // user prog;
-    struct list locks;
-    struct thread *parent;
-    int child_process_tid[CHILD_P_NUM];
-    int child_process_exit_status[CHILD_P_NUM];
-    int child_pos;
-    int count;
+
+  // user prog;
+  struct list locks;
+  struct thread *parent;
+  int child_process_tid[CHILD_P_NUM];
+  int child_process_exit_status[CHILD_P_NUM];
+  int child_pos;
+  int count;
+  struct semaphore sema;
 
 
 
