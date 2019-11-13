@@ -20,6 +20,8 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+int counter = 0;
+
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -42,9 +44,12 @@ char *fn_copy;
   char command_name[FILE_NAME_LEN_LIMIT];
   char file_name_copy[FILE_NAME_LEN_LIMIT];
   char *save_ptr;
+
+
   strlcpy(file_name_copy, file_name, FILE_NAME_LEN_LIMIT);
   strlcpy(command_name, strtok_r((char *) file_name_copy, " ", &save_ptr), FILE_NAME_LEN_LIMIT);
 
+  // check command_name file exists
   struct file *file = filesys_open(command_name);
   if (file == NULL) {
     return EXIT_FAIL;
@@ -208,21 +213,26 @@ process_wait (tid_t child_tid)
   struct thread *t = lookup_tid(child_tid);
   struct thread *cur = thread_current();
 
+  struct child *child = (struct child *) malloc(sizeof(struct child));
   t->parent = thread_current();
-  cur->child_process_tid[cur->child_pos] = t->tid;
-  cur->child_pos++;
-  cur->count++;
+  child->tid = t->tid;
+  child->exit_status = 0;
+  sema_init(&child->child_sema, 0);
+
+  list_push_back(&cur->child_list, &child->child_elem);
 
   enum intr_level old_level;
   old_level = intr_disable();
   sema_down(&cur->sema);
   intr_set_level(old_level);
 
-  for (int i = 0; i < CHILD_P_NUM; i++){
-    if (cur->child_process_tid[i] == child_tid){
-      if (cur->child_process_exit_status[i] != -1)
-      return cur->child_process_exit_status[i];
+  struct list_elem *e = list_begin(&cur->child_list);
+  while (e != list_end(&cur->child_list)){
+    struct child *thr_child = list_entry(e, struct child, child_elem);
+    if (thr_child->tid == child->tid) {
+      return thr_child->exit_status;
     }
+    e = e->next;
   }
 
   return EXIT_FAIL;
@@ -361,7 +371,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
+  lock_acquire(&wait_lock);
   file = filesys_open (file_name);
+  lock_release(&wait_lock);
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);

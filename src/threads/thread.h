@@ -105,11 +105,11 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
-    // self defined:
-    // for priority donation:
-    int priorities[MAX_LEVEL];          /* An array of int to store priorities that this thread get donated*/
-    int currentPos;                     /* current position of array priorities;*/
-    struct thread *donateTo;            /* A pointer to record the thread that this thread donate to*/
+//    // self defined:
+//    // for priority donation:
+//    int priorities[MAX_LEVEL];          /* An array of int to store priorities that this thread get donated*/
+//    int currentPos;                     /* current position of array priorities;*/
+//    struct thread *donateTo;            /* A pointer to record the thread that this thread donate to*/
 
     // for BSD:
     int nice;
@@ -119,9 +119,10 @@ struct thread
   // user prog;
   struct list locks;
   struct thread *parent;
-  int child_process_tid[CHILD_P_NUM];
-  int child_process_exit_status[CHILD_P_NUM];
-  int child_pos;
+//  int child_process_tid[CHILD_P_NUM];
+//  int child_process_exit_status[CHILD_P_NUM];
+  struct list child_list;
+//  int child_pos;
   int count;
   struct semaphore sema;
 

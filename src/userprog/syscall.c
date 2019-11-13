@@ -24,19 +24,21 @@ bool safe_access(void const *esp);
 void release_all_locks(struct thread *t);
 
 struct fileWithFd{
+  const char *name;
     int fd;
     struct file *f;
 };
 
 struct fileWithFd fileFdArray[FILE_LIMIT];
 tid_t tidArray[FILE_LIMIT];
-//bool canBeWritten[FILE_LIMIT];
 bool reopen[FILE_LIMIT];
 int currentFd = STD_IO;
+
 
 void
 syscall_init (void)
 {
+  lock_init(&wait_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -55,7 +57,6 @@ void release_all_locks(struct thread *t){
   while ((next = list_next (e)) != list_end (&t->locks)){
     struct lock *thisLock = list_entry (e, struct lock, lockElem);
     lock_release(thisLock);
-
     e = next;
   }
 }
@@ -155,21 +156,24 @@ halt(void) {
 
 void
 exit (int status) {
-  enum intr_level old_level;
-  old_level = intr_disable();
 
   struct thread *cur = thread_current();
+
   printf("%s: exit(%d)\n", cur->name, status);
   struct thread *parent = thread_current()->parent;
   if (parent != NULL){
-    parent->child_process_tid[parent->child_pos] = thread_current()->tid;
-    parent->child_process_exit_status[parent->child_pos] = status;
-    parent->child_pos++;
-    parent->count--;
+    struct list_elem *e = list_begin(&cur->parent->child_list);
+    while (e != list_end(&cur->parent->child_list)){
+      struct child *thr_child = list_entry(e, struct child, child_elem);
+      if (cur->tid == thr_child->tid) {
+        thr_child->exit_status = status;
+      }
+      e = e->next;
+    }
+
     sema_up(&cur->parent->sema);
   }
 
-  intr_set_level(old_level);
 
   thread_exit();
 }
@@ -179,7 +183,6 @@ exec(const char *cmd_line) {
   if (!safe_access(cmd_line)) {
     return EXIT_FAIL;
   }
-
   pid_t pid = process_execute(cmd_line);
   return pid;
 }
@@ -189,12 +192,15 @@ wait(pid_t pid) {
   enum intr_level old_level;
   old_level = intr_disable();
 
-  for (int i = 0; i< CHILD_P_NUM; i++){
-    if (thread_current()->child_process_tid[i] == pid){
-      return EXIT_FAIL;
-    }
+  struct thread *cur = thread_current();
+
+  struct list_elem *e = list_begin(&cur->child_list);
+  while (e != list_end(&cur->child_list)){
+    struct child *thr_child = list_entry(e, struct child, child_elem);
+    if (thr_child->tid == pid) return EXIT_FAIL;
+    e = e->next;
   }
-  struct thread *t = lookup_tid(pid);
+
   int result = process_wait(pid);
 
   intr_set_level(old_level);
@@ -227,18 +233,29 @@ open(const char *file) {
   if (!strcmp(file, current_file_name)) {
     reopened = true;
   }
+  for (int i=0; i<FILE_LIMIT; i++) {
+    if (fileFdArray[i].f!=NULL) {
+      if (!strcmp(fileFdArray[i].name, file)) {
+        reopened = true;
+        file1 = file_reopen(fileFdArray[i].f);
+        break;
+      }
+    }
+  }
 
   if (strlen(file) == 0 || file1 == NULL) {
     return EXIT_FAIL;
   }
 
   if (currentFd <= FILE_LIMIT) {
+    lock_acquire(&wait_lock);
     currentFd++;
+    lock_release(&wait_lock);
+    fileFdArray[currentFd-STD_IO].name = file;
     fileFdArray[currentFd-STD_IO].fd = currentFd;
     fileFdArray[currentFd-STD_IO].f = file1;
     tidArray[currentFd-STD_IO] = thread_current()->tid;
     reopen[currentFd-STD_IO] = reopened;
-//    canBeWritten[currentFd-STD_IO] = true;
   } else {
     return EXIT_FAIL;
   }
@@ -267,12 +284,10 @@ read(int fd, void *buffer, unsigned size) {
   if (fd == STDIN_FILENO) {
     return input_getc();
   }
-//  canBeWritten[fd-STD_IO] = false;
 
   struct file *currentFile = fileFdArray[fd-STD_IO].f;
 
   if (currentFile != NULL) {
-//    canBeWritten[fd-STD_IO] = true;
     int id = file_read(currentFile, buffer, size);
     return id;
   } else {
@@ -323,7 +338,6 @@ close(int fd) {
     return;
   }
   if (fd <= FILE_LIMIT) {
-//    canBeWritten[fd-STD_IO] = true;
     file_close(fileFdArray[fd-STD_IO].f);
     fileFdArray[fd-STD_IO].f = NULL;
   } else {
