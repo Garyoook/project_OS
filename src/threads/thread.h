@@ -90,6 +90,7 @@ typedef int tid_t;
 
 #define MAX_LEVEL 8+1  /*Max level of donation*/
 
+#define CHILD_P_NUM 64
 struct thread
 {
     /* Owned by thread.c. */
@@ -117,8 +118,8 @@ struct thread
     // user prog;
     struct list locks;
     struct thread *parent;
-    int child_process_tid[100];
-    int child_process_exit_status[100];
+    int child_process_tid[CHILD_P_NUM];
+    int child_process_exit_status[CHILD_P_NUM];
     int child_pos;
     int count;
 

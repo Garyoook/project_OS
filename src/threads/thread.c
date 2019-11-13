@@ -519,7 +519,7 @@ init_thread (struct thread *t, const char *name, int priority)
 #ifdef USERPROG
   t->parent = NULL;
   t->count = 0;
-  for (int i = 0; i < 100; i++){
+  for (int i = 0; i < CHILD_P_NUM; i++){
     t->child_process_exit_status[i] = -1;
     t->child_process_tid[i] = -1;
   }
