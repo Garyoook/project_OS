@@ -524,6 +524,9 @@ init_thread (struct thread *t, const char *name, int priority)
     t->child_process_tid[i] = -1;
   }
   t->child_pos = 0;
+
+
+  list_init(&t->file_list);
 #endif
 
   old_level = intr_disable ();

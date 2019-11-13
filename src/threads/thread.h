@@ -126,10 +126,21 @@ struct thread
   int child_process_exit_status[CHILD_P_NUM];
   int child_pos;
   int count;
+
+  struct list children_list;
+
+
+  struct list file_list;
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+};
+
+struct child_elem
+{
+  tid_t pid;
+  struct list_elem elem;
 };
 
 

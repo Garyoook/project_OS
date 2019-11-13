@@ -449,6 +449,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   success = true;
 
+  //
+  file_deny_write (file);
+
  done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
