@@ -70,6 +70,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   // for user access memory:
   struct thread *t = thread_current();
+  t->in_syscall = true;
 //    release_all_locks(t);
 //  pagedir_clear_page(f->esp, t->pagedir);
 
@@ -167,13 +168,12 @@ exit (int status) {
       struct child *thr_child = list_entry(e, struct child, child_elem);
       if (cur->tid == thr_child->tid) {
         thr_child->exit_status = status;
+        break;
       }
       e = e->next;
     }
-
     sema_up(&cur->parent->sema);
   }
-
 
   thread_exit();
 }
@@ -340,7 +340,5 @@ close(int fd) {
   if (fd <= FILE_LIMIT) {
     file_close(fileFdArray[fd-STD_IO].f);
     fileFdArray[fd-STD_IO].f = NULL;
-  } else {
-    return;
   }
 }

@@ -142,11 +142,16 @@ page_fault (struct intr_frame *f)
   intr_enable ();
   /* Count page faults. */
   page_fault_cnt++;
-  exit(-1);
   /* Determine cause. */
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
+
+  if (thread_current()->in_syscall) {
+    exit(EXIT_FAIL);
+  } else if (!user) {
+    kill(f);
+  }
 
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to

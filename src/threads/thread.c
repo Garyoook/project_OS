@@ -517,6 +517,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
 #ifdef USERPROG
+  t->in_syscall = false;
   t->parent = NULL;
   t->count = 0;
   list_init(&t->child_list);

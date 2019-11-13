@@ -215,7 +215,7 @@ process_wait (tid_t child_tid)
 
   struct child *child = (struct child *) malloc(sizeof(struct child));
   t->parent = thread_current();
-  child->tid = t->tid;
+  child->tid = child_tid;
   child->exit_status = 0;
   sema_init(&child->child_sema, 0);
 
@@ -229,8 +229,11 @@ process_wait (tid_t child_tid)
   struct list_elem *e = list_begin(&cur->child_list);
   while (e != list_end(&cur->child_list)){
     struct child *thr_child = list_entry(e, struct child, child_elem);
-    if (thr_child->tid == child->tid) {
-      return thr_child->exit_status;
+    if (thr_child->tid == child_tid) {
+      int result = thr_child->exit_status;
+      list_remove(e);
+      free(thr_child);
+      return result;
     }
     e = e->next;
   }
