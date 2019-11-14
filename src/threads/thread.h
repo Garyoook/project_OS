@@ -125,6 +125,8 @@ struct thread
   struct file *file_exec;
   int count;
   struct semaphore sema;
+  struct semaphore add_entry_for_child;
+  struct semaphore child_load_complete;
   bool in_syscall;
 
 

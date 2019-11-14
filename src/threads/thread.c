@@ -518,7 +518,7 @@ init_thread (struct thread *t, const char *name, int priority)
 
 #ifdef USERPROG
   t->in_syscall = false;
-  t->parent = NULL;
+  t->parent = list_size(&all_list) > 0 ? thread_current() : NULL;
   t->count = 0;
   list_init(&t->child_list);
   list_init(&t->child_wait_list);

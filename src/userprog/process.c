@@ -56,9 +56,27 @@ char *fn_copy;
   }
   file_close(file);
 
+  struct child *child = (struct child *) malloc(sizeof(struct child));
+  if (child == NULL) {
+    palloc_free_page(fn_copy);
+    return EXIT_FAIL;
+  }
+  sema_init(&child->child_sema, 0);
+  sema_init(&thread_current()->add_entry_for_child, 0);
+  sema_init(&thread_current()->child_load_complete, 0);
+
   tid = thread_create (command_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
+
+  struct thread *t = lookup_tid(tid);
+
+  sema_down(&thread_current()->child_load_complete);
+  child->tid = tid;
+  child->exit_status = 2000;
+  list_push_back(&thread_current()->child_list, &child->child_elem);
+  sema_up(&thread_current()->add_entry_for_child);
+
   return tid;
 }
 
@@ -177,6 +195,8 @@ start_process (void *file_name_)
 
   success = load (command_name, &if_.eip, &if_.esp);
 
+  sema_up(&thread_current()->parent->child_load_complete);
+
   // if load succeeded we start passing the arguments to the stack:
   if (success) {
     success = argument_passing(
@@ -187,6 +207,8 @@ start_process (void *file_name_)
   palloc_free_page (file_name);
   if (!success)
     thread_exit ();
+
+  sema_down(&thread_current()->parent->add_entry_for_child);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -213,24 +235,25 @@ process_wait (tid_t child_tid)
   struct thread *t = lookup_tid(child_tid);
   struct thread *cur = thread_current();
 
-  struct child *child = (struct child *) malloc(sizeof(struct child));
-  t->parent = thread_current();
-  child->tid = child_tid;
-  child->exit_status = 0;
-  sema_init(&child->child_sema, 0);
+//  struct child *child = (struct child *) malloc(sizeof(struct child));
+//  t->parent = thread_current();
+//  child->tid = child_tid;
+//  child->exit_status = 0;
+//  sema_init(&child->child_sema, 0);
+//
+//  list_push_back(&cur->child_list, &child->child_elem);
+//  list_push_back(&cur->child_wait_list, &child->child_elem);
 
-  list_push_back(&cur->child_list, &child->child_elem);
-  list_push_back(&cur->child_wait_list, &child->child_elem);
-
-  enum intr_level old_level;
-  old_level = intr_disable();
-  sema_down(&cur->sema);
-  intr_set_level(old_level);
+//  enum intr_level old_level;
+//  old_level = intr_disable();
+//  intr_set_level(old_level);
 
   struct list_elem *e = list_begin(&cur->child_list);
   while (e != list_end(&cur->child_list)){
     struct child *thr_child = list_entry(e, struct child, child_elem);
     if (thr_child->tid == child_tid) {
+      sema_down(&thr_child->child_sema);
+      list_remove(e);
       return thr_child->exit_status;
     }
     e = e->next;

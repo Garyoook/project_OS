@@ -167,19 +167,35 @@ exit (int status) {
   struct thread *cur = thread_current();
 
   printf("%s: exit(%d)\n", cur->name, status);
-  struct thread *parent = thread_current()->parent;
+  struct thread *parent = cur->parent;
   if (parent != NULL) {
-    struct list_elem *e = list_begin(&cur->parent->child_list);
-    while (e != list_end(&cur->parent->child_list)){
+    struct list_elem *e = list_begin(&parent->child_list);
+    while (e != list_end(&parent->child_list)){
       struct child *thr_child = list_entry(e, struct child, child_elem);
       if (cur->tid == thr_child->tid) {
         thr_child->exit_status = status;
+        sema_up(&thr_child->child_sema);
         break;
       }
       e = e->next;
     }
-    sema_up(&cur->parent->sema);
+
+
+//    enum intr_level old_level = intr_disable();
+//
+//    struct list_elem *e1 = list_begin(&cur->child_list);
+//    while (e1 != list_end(&cur->child_list)) {
+//      struct child *thr_child = list_entry(e1, struct child, child_elem);
+//      printf("**** tid = %d", thr_child->tid);
+//      struct thread *t = lookup_tid(thr_child->tid);
+//      if (t != NULL) {
+//        t->parent = NULL;
+//      }
+//      e1 = list_next(e1);
+//    }
+//    intr_set_level(old_level);
   }
+
 
 //  struct list_elem *e = list_begin(&cur->child_list);
 //  while (e != list_end(&cur->child_list)){
@@ -211,21 +227,22 @@ exec(const char *cmd_line) {
 
 int
 wait(pid_t pid) {
-  enum intr_level old_level;
-  old_level = intr_disable();
+//  enum intr_level old_level;
+//  old_level = intr_disable();
 
-  struct thread *cur = thread_current();
-
-  struct list_elem *e = list_begin(&cur->child_wait_list);
-  while (e != list_end(&cur->child_wait_list)){
-    struct child *thr_child = list_entry(e, struct child, child_elem);
-    if (thr_child->tid == pid) {
+//  struct thread *cur = thread_current();
+//
+//  struct list_elem *e = list_begin(&cur->child_wait_list);
+//  while (e != list_end(&cur->child_wait_list)){
+//    struct child *thr_child = list_entry(e, struct child, child_elem);
+//    if (thr_child->tid == pid) {
+//      sema_down(&thr_child->child_sema);
 //      list_remove(e);
-//      free(thr_child);
-      return EXIT_FAIL;
-    }
-    e = e->next;
-  }
+////      free(thr_child);
+//      return thr_child->exit_status;
+//    }
+//    e = e->next;
+//  }
 
   int result = process_wait(pid);
 
@@ -237,7 +254,7 @@ wait(pid_t pid) {
 //    ew= ew->next;
 //  }
 
-  intr_set_level(old_level);
+//  intr_set_level(old_level);
 
   return result;
 
