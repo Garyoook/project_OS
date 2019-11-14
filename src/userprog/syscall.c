@@ -269,9 +269,9 @@ open(const char *file) {
   if (!strcmp(file, cur->name)) {
     reopened = true;
   }
-//  if (!strcmp(file, current_file_name)) {
-//    reopened = true;
-//  }
+  if (!strcmp(file, current_file_name)) {
+    reopened = true;
+  }
 
 //  for (int i = 0; i < FILE_LIMIT; i++) {
 //    if (fileFdArray[i].f != NULL) {
@@ -404,7 +404,8 @@ write(int fd, const void *buffer, unsigned size) {
       if (fileFd->tid != cur->tid) {
         exit(EXIT_FAIL);
       } else {
-        file_allow_write(fileFd->f);
+        if (!fileFd->reopend)
+          file_allow_write(fileFd->f);
       }
       int result = file_write(fileFd->f, buffer, size);
       file_deny_write(fileFd->f);
