@@ -251,6 +251,8 @@ process_exit (void)
   pd = cur->pagedir;
   if (pd != NULL)
     {
+      if (thread_current()->name == current_file_name)
+        free(current_file_name);
       /* Correct ordering here is crucial.  We must set
          cur->pagedir to NULL before switching page directories,
          so that a timer interrupt can't switch back to the
