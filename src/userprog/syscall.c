@@ -21,16 +21,21 @@
 static void syscall_handler (struct intr_frame *);
 
 bool safe_access(void const *esp);
+// note that we did not use release_all_locks() because we have
+// dealt with all the locks in exit(), keep using it will cause kernel panic;
+void release_all_locks(struct thread *t);
 
+// a struct to keep teack a file with its name, fd, tid and open status.
 struct fileWithFd{
-    const char *name;
-    int fd;
-    struct file *f;
-    struct list_elem file_elem;
-    tid_t tid;
-    bool reopend;
+  struct file *f;
+  const char *name;
+  int fd;
+  tid_t tid;
+  bool reopened;
+  struct list_elem file_elem;
 };
 
+// the initial file descriptor number;
 int currentFd = STD_IO;
 
 void
@@ -45,7 +50,17 @@ bool safe_access(void const *esp) {
   return (is_user_vaddr(esp) &&
     pagedir_get_page(thread_current()->pagedir, esp) &&
     esp != NULL);
+}
 
+void release_all_locks(struct thread *t){
+  struct list_elem *e;
+  e = list_begin (&t->locks);
+
+  while (e != list_end (&t->locks)) {
+    struct lock *thisLock = list_entry (e, struct lock, lockElem);
+    lock_release(thisLock);
+    e = e->next;
+  }
 }
 
 static void
@@ -54,15 +69,16 @@ syscall_handler (struct intr_frame *f UNUSED)
   // check esp is valid:
   if (!safe_access(f->esp)) exit(EXIT_FAIL);
 
-  // for user access memory:
   struct thread *t = thread_current();
+  // mark the thread as "in syscall" for exception checking;
   t->in_syscall = true;
 
+  // syscall is at the top of stack now:
   int syscall_num;
   syscall_num = *(int *)f->esp;
 
   // get all 3 possible arguments
-  // would'nt affect anything if it is not argument.
+  // would'nt affect anything if not all of them are arguments in this syscall
   void **fst = (void **)(f->esp) + 1;
   void **snd = (void **)(f->esp) + 2;
   void **trd = (void **)(f->esp) + 3;
@@ -82,7 +98,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       f->eax = (uint32_t) create(*(char **)fst, (void *)*(int *)snd);
       break;
     case SYS_EXIT:
-      if (!safe_access(fst)) exit(EXIT_FAIL);     //must check it here to pass sc-bad-arg
+      if (!safe_access(fst)) exit(EXIT_FAIL);
       exit(*(int*)fst);
       break;
     case SYS_FILESIZE:
@@ -133,6 +149,21 @@ syscall_handler (struct intr_frame *f UNUSED)
   }
 }
 
+pid_t
+exec(const char *cmd_line) {
+  if (!safe_access(cmd_line)) {
+    return EXIT_FAIL;
+  }
+  pid_t pid = process_execute(cmd_line);
+  return pid;
+}
+
+int
+wait(pid_t pid) {
+  return process_wait(pid);
+}
+
+// halt: power off the system.
 void
 halt(void) {
   shutdown_power_off();
@@ -140,10 +171,12 @@ halt(void) {
 
 void
 exit (int status) {
-
+  enum intr_level old_level;
+  old_level = intr_disable();
   struct thread *cur = thread_current();
-
+  // termination message:
   printf("%s: exit(%d)\n", cur->name, status);
+
   struct thread *parent = cur->parent;
   if (parent != NULL) {
     struct list_elem *e = list_begin(&parent->child_list);
@@ -158,16 +191,16 @@ exit (int status) {
     }
   }
 
-
+  // free the child list;
   struct list_elem *e = list_begin(&cur->child_list);
   while (e != list_end(&cur->child_list)){
     struct child *thr_child = list_entry(e, struct child, child_elem);
     list_remove(e);
     e = e->next;
     free(thr_child);
-
   }
 
+  // free the file list;
   struct list_elem *ef = list_begin(&cur->file_fd_list);
   while (ef != NULL && ef != list_end(&cur->file_fd_list)){
     struct fileWithFd *fileFd = list_entry(ef, struct fileWithFd, file_elem);
@@ -176,21 +209,8 @@ exit (int status) {
     free(fileFd);
   }
 
+  intr_set_level(old_level);
   thread_exit();
-}
-
-pid_t
-exec(const char *cmd_line) {
-  if (!safe_access(cmd_line)) {
-    return EXIT_FAIL;
-  }
-  pid_t pid = process_execute(cmd_line);
-  return pid;
-}
-
-int
-wait(pid_t pid) {
-  return process_wait(pid);
 }
 
 bool
@@ -232,7 +252,10 @@ open(const char *file) {
     currentFd++;
     lock_release(&wait_lock);
 
-    struct fileWithFd *fileFd = (struct fileWithFd *) malloc(sizeof(struct fileWithFd));
+    // initialize the fields of a created file and push it into
+    // the file list of current thread.
+    struct fileWithFd *fileFd =
+        (struct fileWithFd *) malloc(sizeof(struct fileWithFd));
     if (fileFd == NULL) {
       return EXIT_FAIL;
     }
@@ -240,8 +263,8 @@ open(const char *file) {
     fileFd->fd = currentFd;
     fileFd->f = file1;
     fileFd->tid = cur->tid;
-    fileFd->reopend = reopened;
-    if (fileFd->reopend) {
+    fileFd->reopened = reopened;
+    if (fileFd->reopened) {
       file_reopen(fileFd->f);
     }
 
@@ -303,8 +326,6 @@ write(int fd, const void *buffer, unsigned size) {
     exit(EXIT_FAIL);
   }
   if (fd == STDOUT_FILENO) {
-    // size may not bigger than hundred bytes
-    // otherwise may confused
     putbuf(buffer, size);
     return 0;
   }
@@ -317,7 +338,7 @@ write(int fd, const void *buffer, unsigned size) {
       if (fileFd->tid != cur->tid) {
         exit(EXIT_FAIL);
       } else {
-        if (!fileFd->reopend)
+        if (!fileFd->reopened)
           file_allow_write(fileFd->f);
       }
       int result = file_write(fileFd->f, buffer, size);

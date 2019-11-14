@@ -105,7 +105,7 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
-//    // self defined:
+//    // self defined: (task 1)
 //    // for priority donation:
 //    int priorities[MAX_LEVEL];          /* An array of int to store priorities that this thread get donated*/
 //    int currentPos;                     /* current position of array priorities;*/
@@ -116,24 +116,19 @@ struct thread
     fp recent_cpu;
 
 
-  // user prog;
-  struct list locks;
-  struct thread *parent;
-  struct list child_list;
-  struct list child_wait_list;
-  struct list file_fd_list;
-  struct file *file_exec;
-  int count;
-  struct semaphore child_entry_sema;
-  struct semaphore child_load_sema;
-  bool load_success;
-  bool in_syscall;
-
-
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+  // user prog;
+  struct list locks;                    /**/
+  struct thread *parent;                /**/
+  struct list child_list;               /**/
+  struct list file_fd_list;             /**/
+  struct semaphore child_entry_sema;    /**/
+  struct semaphore child_load_sema;     /**/
+  bool load_success;                    /**/
+  bool in_syscall;                      /**/
 #endif
 
     /* Owned by thread.c. */

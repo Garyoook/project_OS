@@ -44,15 +44,18 @@ char *fn_copy;
   char file_name_copy[FILE_NAME_LEN_LIMIT];
   char *save_ptr;
 
-
+  // separate the executable name with the arguments, and then
+  // pass it to file_open and thread_create;
   strlcpy(file_name_copy, file_name, FILE_NAME_LEN_LIMIT);
-  strlcpy(command_name, strtok_r((char *) file_name_copy, " ", &save_ptr), FILE_NAME_LEN_LIMIT);
+  strlcpy(command_name, strtok_r((char *) file_name_copy, " ", &save_ptr),
+      FILE_NAME_LEN_LIMIT);
 
-  // check command_name file exists
+  // add lock to prevent synchronization problems in filesys operation.
   lock_acquire(&wait_lock);
   struct file *file = filesys_open(command_name);
   lock_release(&wait_lock);
 
+  // check command_name file exists
   if (file == NULL) {
     palloc_free_page(fn_copy);
     return EXIT_FAIL;
@@ -71,12 +74,11 @@ char *fn_copy;
   tid = thread_create (command_name, PRI_DEFAULT, start_process, fn_copy);
 
   sema_down(&thread_current()->child_load_sema);
-
+  // if the child do not get loaded properly, free it and exit with code -1;
   if (!thread_current()->load_success) {
     free(child);
     return EXIT_FAIL;
   }
-
 
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
@@ -84,20 +86,22 @@ char *fn_copy;
     return EXIT_FAIL;
   }
 
+  // set the fields of the child process and push it into the child list.
   child->tid = tid;
   child->exit_status = -1;
   list_push_back(&thread_current()->child_list, &child->child_elem);
+  // inform the parent that the child has been added into the list.
   sema_up(&thread_current()->child_entry_sema);
 
   return tid;
 }
 
+// a newly added function to check the stack is not overflowed.
 static void check_stack_overflow(int used);
 
 // use this to pass and push the arguments to the stack:
 static bool argument_passing(void **esp, char *file_name) {
   current_file_name = malloc(strlen(file_name) + 1);
-
 // push arguments to the stack;
   enum intr_level old_level;
   old_level = intr_disable();
@@ -116,6 +120,7 @@ static bool argument_passing(void **esp, char *file_name) {
   void *addrArr[ARGC];
   void *addr_argv;
 
+  // tokenize the arguments and store them into the argArr.
   for (token = strtok_r (s, " ", &save_ptr); token != NULL;
        token = strtok_r (NULL, " ", &save_ptr)) {
     argArr[argc] = token;
@@ -164,6 +169,7 @@ static bool argument_passing(void **esp, char *file_name) {
   *esp = *esp - sizeof (int);
   *(int *)*esp = argc;
 
+  // last, the null pointer to the stack.
   *esp = *esp - sizeof (void *);
   void *nullPtr = NULL;
   memcpy (*esp, &nullPtr, sizeof (void *));
@@ -173,10 +179,9 @@ static bool argument_passing(void **esp, char *file_name) {
   intr_set_level(old_level);
 
   return true;
-
-//
 }
 
+// check that the bytes used does not exceed the limit of stack.
 static void check_stack_overflow(int used) {
   if (used > STACK_LIMIT) {
     exit(EXIT_FAIL);
@@ -203,13 +208,13 @@ start_process (void *file_name_)
   char s[cmdLen];
   strlcpy(s, file_name, (cmdLen + 1));
 
+  // take the executable name and pass it to load();
   char *command_name, *save_ptr;
   command_name = strtok_r((char *) s, " ", &save_ptr);
 
   success = load (command_name, &if_.eip, &if_.esp);
 
   cur->parent->load_success = success;
-
   sema_up(&cur->parent->child_load_sema);
 
   // if load succeeded we start passing the arguments to the stack:
@@ -248,12 +253,16 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid)
 {
+  enum intr_level old_level;
+  old_level = intr_disable();
+
   struct thread *cur = thread_current();
   struct list_elem *e = list_begin(&cur->child_list);
 
   while (e != list_end(&cur->child_list)){
     struct child *thr_child = list_entry(e, struct child, child_elem);
-
+    // if the wait target child is in the list, sema down
+    // and remove it from the list. return the exit status of the child.
     if (thr_child->tid == child_tid) {
       sema_down(&thr_child->child_sema);
       list_remove(e);
@@ -262,6 +271,7 @@ process_wait (tid_t child_tid)
     }
     e = e->next;
   }
+  intr_set_level(old_level);
 
   return EXIT_FAIL;
 }
@@ -278,6 +288,7 @@ process_exit (void)
   pd = cur->pagedir;
   if (pd != NULL)
     {
+      // free the name we malloced for checking file reopen;
       if (thread_current()->name == current_file_name)
         free(current_file_name);
       /* Correct ordering here is crucial.  We must set
@@ -491,15 +502,14 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   success = true;
 
-  //
+  // deny write as the file is ready to run at the moment.
   file_deny_write (file);
-
  done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
   return success;
 }
-
+
 /* load() helpers. */
 
 static bool install_page (void *upage, void *kpage, bool writable);
