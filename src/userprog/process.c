@@ -67,7 +67,7 @@ char *fn_copy;
   }
   sema_init(&child->child_sema, 0);
   sema_init(&thread_current()->add_entry_for_child, 0);
-  sema_init(&thread_current()->child_load_complete, 0);
+  sema_init(&thread_current()->child_load_sema, 0);
 
   tid = thread_create (command_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR) {
@@ -76,11 +76,9 @@ char *fn_copy;
     return EXIT_FAIL;
   }
 
-  struct thread *t = lookup_tid(tid);
-
-  sema_down(&thread_current()->child_load_complete);
+  sema_down(&thread_current()->child_load_sema);
   child->tid = tid;
-  child->exit_status = 2000;
+  child->exit_status = -1;
   list_push_back(&thread_current()->child_list, &child->child_elem);
   sema_up(&thread_current()->add_entry_for_child);
 
@@ -202,7 +200,7 @@ start_process (void *file_name_)
 
   success = load (command_name, &if_.eip, &if_.esp);
 
-  sema_up(&thread_current()->parent->child_load_complete);
+  sema_up(&thread_current()->parent->child_load_sema);
 
   // if load succeeded we start passing the arguments to the stack:
   if (success) {
@@ -483,6 +481,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
+
+  //
+  file_deny_write (file);
 
  done:
 //  if (file != NULL) {

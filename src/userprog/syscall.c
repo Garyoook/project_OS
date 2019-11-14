@@ -197,21 +197,23 @@ exit (int status) {
   }
 
 
-//  struct list_elem *e = list_begin(&cur->child_list);
-//  while (e != list_end(&cur->child_list)){
-//    struct child *thr_child = list_entry(e, struct child, child_elem);
-//    list_remove(e);
-//    free(thr_child);
-//    e = e->next;
-//  }
-//
-//  struct list_elem *ew = list_begin(&cur->child_wait_list);
-//  while (ew != list_end(&cur->child_wait_list)){
-//    struct child *thr_child = list_entry(ew, struct child, child_elem);
-//    list_remove(ew);
-//    free(thr_child);
-//    ew = ew->next;
-//  }
+  struct list_elem *e = list_begin(&cur->child_list);
+  while (e != list_end(&cur->child_list)){
+    struct child *thr_child = list_entry(e, struct child, child_elem);
+    list_remove(e);
+    e = e->next;
+    free(thr_child);
+
+  }
+
+  struct list_elem *ef = list_begin(&cur->file_fd_list);
+  while (ef != NULL && ef != list_end(&cur->file_fd_list)){
+    struct fileWithFd *fileFd = list_entry(ef, struct fileWithFd, file_elem);
+//      if (fileFd != NULL)
+    list_remove(ef);
+    ef = ef->next;
+    free(fileFd);
+  }
 
   thread_exit();
 }
@@ -227,37 +229,7 @@ exec(const char *cmd_line) {
 
 int
 wait(pid_t pid) {
-//  enum intr_level old_level;
-//  old_level = intr_disable();
-
-//  struct thread *cur = thread_current();
-//
-//  struct list_elem *e = list_begin(&cur->child_wait_list);
-//  while (e != list_end(&cur->child_wait_list)){
-//    struct child *thr_child = list_entry(e, struct child, child_elem);
-//    if (thr_child->tid == pid) {
-//      sema_down(&thr_child->child_sema);
-//      list_remove(e);
-////      free(thr_child);
-//      return thr_child->exit_status;
-//    }
-//    e = e->next;
-//  }
-
-  int result = process_wait(pid);
-
-//  struct list_elem *ew= list_begin(&cur->child_list);
-//  while (ew!= list_end(&cur->child_list)){
-//    struct child *thr_child = list_entry(ew, struct child, child_elem);
-//    list_remove(ew);
-//    free(thr_child);
-//    ew= ew->next;
-//  }
-
-//  intr_set_level(old_level);
-
-  return result;
-
+  return process_wait(pid);
 }
 
 bool
@@ -488,13 +460,14 @@ close(int fd) {
       if (fileFd->f == NULL || fileFd->tid != cur->tid) {
         return;
       }
-      if (fd <= FILE_LIMIT) {
         file_close(fileFd->f);
         list_remove(e);
-//        free(fileFd);
-      }
+        e = e->next;
+        free(fileFd);
+    } else {
+      e = e->next;
     }
-    e = e->next;
+
   }
 
 //  if (fileFdArray[fd-STD_IO].f == NULL){

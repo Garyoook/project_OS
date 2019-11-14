@@ -126,7 +126,7 @@ struct thread
   int count;
   struct semaphore sema;
   struct semaphore add_entry_for_child;
-  struct semaphore child_load_complete;
+  struct semaphore child_load_sema;
   bool in_syscall;
 
 
