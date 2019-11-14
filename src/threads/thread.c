@@ -517,16 +517,17 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
 #ifdef USERPROG
-  t->parent = NULL;
+  t->in_syscall = false;
+  t->parent = list_size(&all_list) > 0 ? thread_current() : NULL;
   t->count = 0;
-  for (int i = 0; i < CHILD_P_NUM; i++){
-    t->child_process_exit_status[i] = -1;
-    t->child_process_tid[i] = -1;
-  }
-  t->child_pos = 0;
-
-
-  list_init(&t->file_list);
+  list_init(&t->child_list);
+  list_init(&t->file_fd_list);
+//  for (int i = 0; i < CHILD_P_NUM; i++){
+//    t->child_process_exit_status[i] = -1;
+//    t->child_process_tid[i] = -1;
+//  }
+//  t->child_pos = 0;
+  sema_init(&t->sema, 0);
 #endif
 
   old_level = intr_disable ();
@@ -646,9 +647,6 @@ allocate_tid (void)
 
 
 struct thread* lookup_tid(tid_t tid){
-
-
-
   if (!list_empty(&all_list)) {
     struct list_elem *e = list_begin(&all_list);
     while (e != list_end(&all_list)){

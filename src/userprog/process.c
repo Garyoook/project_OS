@@ -20,6 +20,8 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+int counter = 0;
+
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -42,18 +44,44 @@ char *fn_copy;
   char command_name[FILE_NAME_LEN_LIMIT];
   char file_name_copy[FILE_NAME_LEN_LIMIT];
   char *save_ptr;
+
+
   strlcpy(file_name_copy, file_name, FILE_NAME_LEN_LIMIT);
   strlcpy(command_name, strtok_r((char *) file_name_copy, " ", &save_ptr), FILE_NAME_LEN_LIMIT);
 
+  // check command_name file exists
+  lock_acquire(&wait_lock);
   struct file *file = filesys_open(command_name);
+  lock_release(&wait_lock);
+
   if (file == NULL) {
+    palloc_free_page(fn_copy);
     return EXIT_FAIL;
   }
   file_close(file);
 
+  struct child *child = (struct child *) malloc(sizeof(struct child));
+  if (child == NULL) {
+    palloc_free_page(fn_copy);
+    return EXIT_FAIL;
+  }
+  sema_init(&child->child_sema, 0);
+  sema_init(&thread_current()->add_entry_for_child, 0);
+  sema_init(&thread_current()->child_load_sema, 0);
+
   tid = thread_create (command_name, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
+  if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
+    free(child);
+    return EXIT_FAIL;
+  }
+
+  sema_down(&thread_current()->child_load_sema);
+  child->tid = tid;
+  child->exit_status = -1;
+  list_push_back(&thread_current()->child_list, &child->child_elem);
+  sema_up(&thread_current()->add_entry_for_child);
+
   return tid;
 }
 
@@ -61,8 +89,8 @@ static void check_stack_overflow(int used);
 
 // use this to pass and push the arguments to the stack:
 static bool argument_passing(void **esp, char *file_name) {
-current_file_name = malloc(strlen(file_name) + 1);
-strlcpy(current_file_name, file_name, strlen(file_name) + 1);
+  current_file_name = malloc(strlen(file_name) + 1);
+//strlcpy(current_file_name, file_name, strlen(file_name) + 1);
 // push arguments to the stack;
   enum intr_level old_level;
   old_level = intr_disable();
@@ -172,6 +200,8 @@ start_process (void *file_name_)
 
   success = load (command_name, &if_.eip, &if_.esp);
 
+  sema_up(&thread_current()->parent->child_load_sema);
+
   // if load succeeded we start passing the arguments to the stack:
   if (success) {
     success = argument_passing(
@@ -180,8 +210,11 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
+
   if (!success)
     thread_exit ();
+
+  sema_down(&thread_current()->parent->add_entry_for_child);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -207,22 +240,18 @@ process_wait (tid_t child_tid)
 {
   struct thread *t = lookup_tid(child_tid);
   struct thread *cur = thread_current();
+  struct list_elem *e = list_begin(&cur->child_list);
 
-  t->parent = thread_current();
-  cur->child_process_tid[cur->child_pos] = t->tid;
-  cur->child_pos++;
-  cur->count++;
+  while (e != list_end(&cur->child_list)){
+    struct child *thr_child = list_entry(e, struct child, child_elem);
 
-  enum intr_level old_level;
-  old_level = intr_disable();
-  thread_block();
-  intr_set_level(old_level);
+    if (thr_child->tid == child_tid) {
+      sema_down(&thr_child->child_sema);
+      list_remove(e);
 
-  for (int i = 0; i < CHILD_P_NUM; i++){
-    if (cur->child_process_tid[i] == child_tid){
-      if (cur->child_process_exit_status[i] != -1)
-      return cur->child_process_exit_status[i];
+      return thr_child->exit_status;
     }
+    e = e->next;
   }
 
   return EXIT_FAIL;
@@ -240,6 +269,8 @@ process_exit (void)
   pd = cur->pagedir;
   if (pd != NULL)
     {
+      if (thread_current()->name == current_file_name)
+        free(current_file_name);
       /* Correct ordering here is crucial.  We must set
          cur->pagedir to NULL before switching page directories,
          so that a timer interrupt can't switch back to the
@@ -361,7 +392,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
+  lock_acquire(&wait_lock);
   file = filesys_open (file_name);
+  lock_release(&wait_lock);
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);
@@ -453,6 +486,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
   file_deny_write (file);
 
  done:
+//  if (file != NULL) {
+//    t->file_exec = file;
+//    file_deny_write(file);
+//  }
   /* We arrive here whether the load is successful or not. */
   file_close (file);
   return success;

@@ -23,27 +23,26 @@ static void syscall_handler (struct intr_frame *);
 bool safe_access(void const *esp);
 void release_all_locks(struct thread *t);
 
-struct file_with_fd {
-  int fd;
-  struct file *file;
-  struct list_elem elem;
-  tid_t thread_id;
-  bool opened;
-};
-
 struct fileWithFd{
+    const char *name;
     int fd;
     struct file *f;
+    struct list_elem file_elem;
+    tid_t tid;
+    bool reopend;
 };
 
+
 //struct fileWithFd fileFdArray[FILE_LIMIT];
-tid_t tidArray[FILE_LIMIT];
-bool reopen[FILE_LIMIT];
+//tid_t tidArray[FILE_LIMIT];
+//bool reopen[FILE_LIMIT];
 int currentFd = STD_IO;
+
 
 void
 syscall_init (void)
 {
+  lock_init(&wait_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -62,7 +61,6 @@ void release_all_locks(struct thread *t){
   while ((next = list_next (e)) != list_end (&t->locks)){
     struct lock *thisLock = list_entry (e, struct lock, lockElem);
     lock_release(thisLock);
-
     e = next;
   }
 }
@@ -76,6 +74,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   // for user access memory:
   struct thread *t = thread_current();
+  t->in_syscall = true;
 //    release_all_locks(t);
 //  pagedir_clear_page(f->esp, t->pagedir);
 
@@ -92,6 +91,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   switch (syscall_num) {
     case SYS_EXEC:
+      if (!safe_access(fst)) exit(EXIT_FAIL);
       f->eax = (uint32_t) exec(*(char **)fst);
       break;
     case SYS_CLOSE:
@@ -104,6 +104,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       f->eax = (uint32_t) create(*(char **)fst, (void *)*(int *)snd);
       break;
     case SYS_EXIT:
+
       if (!safe_access(fst)) exit(EXIT_FAIL);//must check it here to pass sc-bad-arg
       exit(*(int*)fst);
       break;
@@ -121,12 +122,14 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_READ:
       if (!safe_access(fst)) exit(EXIT_FAIL);
       if (!safe_access(snd)) exit(EXIT_FAIL);
+      if (!safe_access(*snd)) exit(EXIT_FAIL);
       if (!safe_access(trd)) exit(EXIT_FAIL);
       f->eax = (uint32_t) read(*(int *)fst, *snd, *(unsigned *) trd);
       break;
     case SYS_WRITE:
       if (!safe_access(fst)) exit(EXIT_FAIL);
       if (!safe_access(snd)) exit(EXIT_FAIL);
+      if (!safe_access(*snd)) exit(EXIT_FAIL);
       if (!safe_access(trd)) exit(EXIT_FAIL);
       f->eax = (uint32_t) write(*(int *)fst, *snd, *(unsigned *) trd);
       break;
@@ -160,51 +163,59 @@ halt(void) {
 
 void
 exit (int status) {
-  printf("%s: exit(%d)\n", thread_name (), status);
 
-  // close all file descriptors whic are open
-  struct thread *t = thread_current ();
+  struct thread *cur = thread_current();
 
-  struct list_elem *e;
+  printf("%s: exit(%d)\n", cur->name, status);
+  struct thread *parent = cur->parent;
+  if (parent != NULL) {
+    struct list_elem *e = list_begin(&parent->child_list);
+    while (e != list_end(&parent->child_list)){
+      struct child *thr_child = list_entry(e, struct child, child_elem);
+      if (cur->tid == thr_child->tid) {
+        thr_child->exit_status = status;
+        sema_up(&thr_child->child_sema);
+        break;
+      }
+      e = e->next;
+    }
 
-  while (!list_empty (&t->file_list))
-  {
-    e = list_pop_back (&t->file_list);
-    struct file_with_fd *file_with_fd = list_entry (e, struct file_with_fd, elem);
-    file_close (file_with_fd->file);
-    free (file_with_fd);
+
+//    enum intr_level old_level = intr_disable();
+//
+//    struct list_elem *e1 = list_begin(&cur->child_list);
+//    while (e1 != list_end(&cur->child_list)) {
+//      struct child *thr_child = list_entry(e1, struct child, child_elem);
+//      printf("**** tid = %d", thr_child->tid);
+//      struct thread *t = lookup_tid(thr_child->tid);
+//      if (t != NULL) {
+//        t->parent = NULL;
+//      }
+//      e1 = list_next(e1);
+//    }
+//    intr_set_level(old_level);
   }
 
-  struct thread *parent = thread_current()->parent;
-  if (parent != NULL){
-    parent->child_process_tid[parent->child_pos] = thread_current()->tid;
-    parent->child_process_exit_status[parent->child_pos] = status;
-    parent->child_pos++;
-    parent->count--;
-    thread_unblock(t->parent);
+
+  struct list_elem *e = list_begin(&cur->child_list);
+  while (e != list_end(&cur->child_list)){
+    struct child *thr_child = list_entry(e, struct child, child_elem);
+    list_remove(e);
+    e = e->next;
+    free(thr_child);
+
   }
 
-  thread_exit ();
+  struct list_elem *ef = list_begin(&cur->file_fd_list);
+  while (ef != NULL && ef != list_end(&cur->file_fd_list)){
+    struct fileWithFd *fileFd = list_entry(ef, struct fileWithFd, file_elem);
+//      if (fileFd != NULL)
+    list_remove(ef);
+    ef = ef->next;
+    free(fileFd);
+  }
 
-
-
-//  enum intr_level old_level;
-//  old_level = intr_disable();
-//
-//  struct thread *cur = thread_current();
-//  printf("%s: exit(%d)\n", cur->name, status);
-//  struct thread *parent = thread_current()->parent;
-//  if (parent != NULL){
-//    parent->child_process_tid[parent->child_pos] = thread_current()->tid;
-//    parent->child_process_exit_status[parent->child_pos] = status;
-//    parent->child_pos++;
-//    parent->count--;
-//    thread_unblock(cur->parent);
-//  }
-//
-//  intr_set_level(old_level);
-//
-//  thread_exit();
+  thread_exit();
 }
 
 pid_t
@@ -212,32 +223,13 @@ exec(const char *cmd_line) {
   if (!safe_access(cmd_line)) {
     return EXIT_FAIL;
   }
-
   pid_t pid = process_execute(cmd_line);
-  if (pid == TID_ERROR)
-  {
-    return -1;
-  }
   return pid;
 }
 
 int
 wait(pid_t pid) {
-  enum intr_level old_level;
-  old_level = intr_disable();
-
-  for (int i = 0; i< CHILD_P_NUM; i++){
-    if (thread_current()->child_process_tid[i] == pid){
-      return EXIT_FAIL;
-    }
-  }
-  struct thread *t = lookup_tid(pid);
-  int result = process_wait(pid);
-
-  intr_set_level(old_level);
-
-  return result;
-
+  return process_wait(pid);
 }
 
 bool
@@ -259,38 +251,58 @@ remove(const char *file) {
 
 int
 open(const char *file) {
-  static int fd_new = 2;
-  int fd;
   bool reopened = false;
   struct file *file1 = filesys_open(file);
+  struct thread *cur = thread_current();
+
+  if (!strcmp(file, cur->name)) {
+    reopened = true;
+  }
   if (!strcmp(file, current_file_name)) {
     reopened = true;
   }
+
+//  for (int i = 0; i < FILE_LIMIT; i++) {
+//    if (fileFdArray[i].f != NULL) {
+//      if (!strcmp(fileFdArray[i].name, file)) {
+//        reopened = true;
+//        file1 = file_reopen(fileFdArray[i].f);
+//        break;
+//      }
+//    }
+//  }
+
   if (strlen(file) == 0 || file1 == NULL) {
     return EXIT_FAIL;
+  }
+
+  if (currentFd <= FILE_LIMIT) {
+    lock_acquire(&wait_lock);
+    currentFd++;
+    lock_release(&wait_lock);
+
+//    struct list_elem *e = list_begin(&cur->file_fd_list);
+      struct fileWithFd *fileFd = (struct fileWithFd *) malloc(sizeof(struct fileWithFd));
+      if (fileFd == NULL) {
+        return EXIT_FAIL;
+      }
+      fileFd->name = file;
+      fileFd->fd = currentFd;
+      fileFd->f = file1;
+      fileFd->tid = cur->tid;
+      fileFd->reopend = reopened;
+      if (fileFd->reopend) {
+        file_reopen(fileFd->f);
+      }
+
+      list_push_back(&cur->file_fd_list, &fileFd->file_elem);
+
   } else {
-//    lock_acquire ();
-    fd = fd_new++;
-//    lock_release ();
+    return EXIT_FAIL;
   }
-  struct thread *t = thread_current ();
-  struct file_with_fd *file_with_fd;
-  file_with_fd = (struct file_with_fd *) malloc (sizeof (struct file_with_fd));
-  if (file_with_fd == NULL)
-  {
-    exit (EXIT_FAIL);
-  }
-
-  file_with_fd->fd =fd;
-  file_with_fd->file = file1;
-
-  file_with_fd->thread_id = thread_current()->tid;
-  file_with_fd->opened = reopened;
-
-  list_push_back (&t->file_list, &file_with_fd->elem);
 
 //  if (currentFd <= FILE_LIMIT) {
-//    currentFd++;
+//    fileFdArray[currentFd-STD_IO].name = file;
 //    fileFdArray[currentFd-STD_IO].fd = currentFd;
 //    fileFdArray[currentFd-STD_IO].f = file1;
 //    tidArray[currentFd-STD_IO] = thread_current()->tid;
@@ -303,19 +315,20 @@ open(const char *file) {
   return currentFd;
 }
 
-//Given a fd, find the file
-static struct file *
-find_file (int fd)
-;
-
 int
 filesize(int fd) {
-  struct file *file = find_file(fd);
-  if (!file) {
-    exit(EXIT_FAIL);
+  struct thread *cur = thread_current();
+  struct list_elem *e = list_begin(&cur->file_fd_list);
+  while (e != list_end(&cur->file_fd_list)){
+    struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
+    if (fileFd->fd == fd) {
+      if (fileFd->f == NULL) {
+        exit(EXIT_FAIL);
+      }
+      return file_length(fileFd->f);
+    }
+    e = e->next;
   }
-
-  return file_length(file);
 
 //  if (fileFdArray[fd-STD_IO].f == NULL) {
 //    exit(EXIT_FAIL);
@@ -325,35 +338,33 @@ filesize(int fd) {
 
 int
 read(int fd, void *buffer, unsigned size) {
-  if (fd <= STDOUT_FILENO || fd > FILE_LIMIT) {
+  if (fd < STDOUT_FILENO || fd > FILE_LIMIT) {
     exit(EXIT_FAIL);
   }
+//  if (tidArray[fd-STD_IO] != thread_current()->tid) {
+//    exit(EXIT_FAIL);
+//  }
   if (fd == STDIN_FILENO) {
     return input_getc();
   }
-  struct file *file = find_file(fd);
 
-//  if (tidArray[fd-STD_IO] != thread_current()->tid) {
-//    exit(EXIT_FAIL);
-//  }
-
-  if (file != NULL) {
-    exit(EXIT_FAIL);
-  } else {
-    return file_read(file,buffer, size);
+  struct thread *cur = thread_current();
+  struct list_elem *e = list_begin(&cur->file_fd_list);
+  while (e != list_end(&cur->file_fd_list)){
+    struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
+    if (fileFd->fd == fd) {
+        if (fileFd->tid != cur->tid) {
+          exit(EXIT_FAIL);
+        }
+      if (fileFd->f != NULL) {
+        return file_read(fileFd->f, buffer, size);
+      } else {
+        exit(EXIT_FAIL);
+      }
+    }
+    e = e->next;
   }
 
-
-//  if (fd < STDOUT_FILENO || fd > FILE_LIMIT) {
-//    exit(EXIT_FAIL);
-//  }
-//  if (fd == STDIN_FILENO) {
-//    return input_getc();
-//  }
-//  if (tidArray[fd-STD_IO] != thread_current()->tid) {
-//    exit(EXIT_FAIL);
-//  }
-//
 //  struct file *currentFile = fileFdArray[fd-STD_IO].f;
 //
 //  if (currentFile != NULL) {
@@ -366,49 +377,40 @@ read(int fd, void *buffer, unsigned size) {
 
 int
 write(int fd, const void *buffer, unsigned size) {
-  int result = EXIT_FAIL;
-
-  if (fd == STDIN_FILENO || fd < -1)
-  {
+  if (fd < STDOUT_FILENO || fd > FILE_LIMIT) {
     exit(EXIT_FAIL);
   }
-
-  // write to console
-  if (fd == STDOUT_FILENO)
-  {
+  if (fd == STDOUT_FILENO) {
+    // size may not bigger than hundred bytes
+    // otherwise may confused
     putbuf(buffer, size);
-    return size;
+    return 0;
   }
 
-  struct file *file = find_file (fd);
-
-//  if (tidArray[fd-STD_IO] == thread_current()->tid && !reopen[fd-STD_IO]) {
-//    file_allow_write(file);
-//  }
-
-  if (file != NULL)
-    //write to given file descripter
-    result = file_write (file, buffer, size);
-  else {
-    exit(EXIT_FAIL);
+  struct thread *cur = thread_current();
+  struct list_elem *e = list_begin(&cur->file_fd_list);
+  while (e != list_end(&cur->file_fd_list)){
+    struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
+    if (fileFd->fd == fd ) {
+      if (fileFd->tid != cur->tid) {
+        exit(EXIT_FAIL);
+      } else {
+        if (!fileFd->reopend)
+          file_allow_write(fileFd->f);
+      }
+      int result = file_write(fileFd->f, buffer, size);
+      file_deny_write(fileFd->f);
+      return result;
+    }
+    e = e->next;
   }
 
-//  file_deny_write(file);
-  return result;
 
 
-//  //
-//  if (fd < STDOUT_FILENO|| fd > FILE_LIMIT) {
-//    exit(EXIT_FAIL);
-//  }
-//  if (fd == STDOUT_FILENO) {
-//    // size may not bigger than hundred bytes
-//    // otherwise may confused
-//    putbuf(buffer, size);
-//    return 0;
-//  }
-//
-//  if (tidArray[fd-STD_IO] == thread_current()->tid && !reopen[fd-STD_IO]) {
+
+//  if (tidArray[fd-STD_IO] != thread_current()->tid || reopen[fd-STD_IO]) {
+////    exit(EXIT_FAIL);
+//  } else {
 //    file_allow_write(fileFdArray[fd-STD_IO].f);
 //  }
 //
@@ -420,11 +422,14 @@ write(int fd, const void *buffer, unsigned size) {
 
 void
 seek(int fd, unsigned position) {
-  struct file *file = find_file(fd);
-  if (file != NULL)
-    file_seek(file, position);
-  else {
-    exit(EXIT_FAIL);
+  struct thread *cur = thread_current();
+  struct list_elem *e = list_begin(&cur->file_fd_list);
+  while (e != list_end(&cur->file_fd_list)){
+    struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
+    if (fileFd->fd == fd ) {
+      file_seek(fileFd->f, position);
+    }
+    e = e->next;
   }
 
 //  file_seek(fileFdArray[fd-STD_IO].f, position);
@@ -432,36 +437,38 @@ seek(int fd, unsigned position) {
 
 unsigned
 tell(int fd) {
-  struct file *file = find_file(fd);
-  if (file != NULL) {
-    return (unsigned int)file_tell(file);
-  } else {
-    exit(EXIT_FAIL);
+  struct thread *cur = thread_current();
+  struct list_elem *e = list_begin(&cur->file_fd_list);
+  while (e != list_end(&cur->file_fd_list)){
+    struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
+    if (fileFd->fd == fd ) {
+      return (unsigned int) file_tell(fileFd->f);
+    }
+    e = e->next;
   }
+
+//  return (unsigned int) file_tell(fileFdArray[fd-STD_IO].f);
 }
 
 void
 close(int fd) {
-  struct thread *t = thread_current ();
-  struct list_elem *e;
-
-  for (e = list_begin (&t->file_list); e != list_end (&t->file_list);
-       e = list_next (e))
-  {
-    struct file_with_fd *file_with_fd = list_entry (e, struct file_with_fd, elem);
-    if (file_with_fd->fd == fd)
-    {
-      file_close (file_with_fd->file);
-      list_remove (e);
-      return;
+  struct thread *cur = thread_current();
+  struct list_elem *e = list_begin(&cur->file_fd_list);
+  while (e != list_end(&cur->file_fd_list)){
+    struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
+    if (fileFd->fd == fd ) {
+      if (fileFd->f == NULL || fileFd->tid != cur->tid) {
+        return;
+      }
+        file_close(fileFd->f);
+        list_remove(e);
+        e = e->next;
+        free(fileFd);
+    } else {
+      e = e->next;
     }
+
   }
-
-  exit(EXIT_FAIL);
-
-
-
-
 
 //  if (fileFdArray[fd-STD_IO].f == NULL){
 //    return;
@@ -472,23 +479,5 @@ close(int fd) {
 //  if (fd <= FILE_LIMIT) {
 //    file_close(fileFdArray[fd-STD_IO].f);
 //    fileFdArray[fd-STD_IO].f = NULL;
-//  } else {
-//    return;
 //  }
-}
-
-//Given a fd, find the file
-static struct file *
-find_file (int fd)
-{
-  struct thread *t = thread_current ();
-  struct list_elem *e;
-
-  for (e = list_begin (&t->file_list);e != list_end (&t->file_list);e = list_next (e))
-  {
-    struct file_with_fd *file_with_fd = list_entry (e, struct file_with_fd, elem);
-    if (file_with_fd->fd == fd)
-      return file_with_fd->file;
-  }
-  return NULL;
 }

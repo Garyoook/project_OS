@@ -6,6 +6,15 @@
 #include <user/syscall.h>
 #include "threads/thread.h"
 
+struct child {
+  tid_t tid;
+  int exit_status;
+  struct semaphore child_sema;
+  struct list_elem child_elem;
+};
+
+
+struct lock wait_lock;
 char *current_file_name;
 
 void syscall_init (void);
