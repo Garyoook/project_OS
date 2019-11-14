@@ -21,7 +21,6 @@
 static void syscall_handler (struct intr_frame *);
 
 bool safe_access(void const *esp);
-void release_all_locks(struct thread *t);
 
 struct fileWithFd{
     const char *name;
@@ -32,12 +31,7 @@ struct fileWithFd{
     bool reopend;
 };
 
-
-//struct fileWithFd fileFdArray[FILE_LIMIT];
-//tid_t tidArray[FILE_LIMIT];
-//bool reopen[FILE_LIMIT];
 int currentFd = STD_IO;
-
 
 void
 syscall_init (void)
@@ -54,18 +48,6 @@ bool safe_access(void const *esp) {
 
 }
 
-void release_all_locks(struct thread *t){
-  struct list_elem *e,*next;
-  e = list_begin (&t->locks);
-
-  while ((next = list_next (e)) != list_end (&t->locks)){
-    struct lock *thisLock = list_entry (e, struct lock, lockElem);
-    lock_release(thisLock);
-    e = next;
-  }
-}
-// ---------------------------------
-
 static void
 syscall_handler (struct intr_frame *f UNUSED)
 {
@@ -75,10 +57,6 @@ syscall_handler (struct intr_frame *f UNUSED)
   // for user access memory:
   struct thread *t = thread_current();
   t->in_syscall = true;
-//    release_all_locks(t);
-//  pagedir_clear_page(f->esp, t->pagedir);
-
-  // ---------------------------------
 
   int syscall_num;
   syscall_num = *(int *)f->esp;
@@ -104,8 +82,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       f->eax = (uint32_t) create(*(char **)fst, (void *)*(int *)snd);
       break;
     case SYS_EXIT:
-
-      if (!safe_access(fst)) exit(EXIT_FAIL);//must check it here to pass sc-bad-arg
+      if (!safe_access(fst)) exit(EXIT_FAIL);     //must check it here to pass sc-bad-arg
       exit(*(int*)fst);
       break;
     case SYS_FILESIZE:
@@ -179,21 +156,6 @@ exit (int status) {
       }
       e = e->next;
     }
-
-
-//    enum intr_level old_level = intr_disable();
-//
-//    struct list_elem *e1 = list_begin(&cur->child_list);
-//    while (e1 != list_end(&cur->child_list)) {
-//      struct child *thr_child = list_entry(e1, struct child, child_elem);
-//      printf("**** tid = %d", thr_child->tid);
-//      struct thread *t = lookup_tid(thr_child->tid);
-//      if (t != NULL) {
-//        t->parent = NULL;
-//      }
-//      e1 = list_next(e1);
-//    }
-//    intr_set_level(old_level);
   }
 
 
@@ -209,7 +171,6 @@ exit (int status) {
   struct list_elem *ef = list_begin(&cur->file_fd_list);
   while (ef != NULL && ef != list_end(&cur->file_fd_list)){
     struct fileWithFd *fileFd = list_entry(ef, struct fileWithFd, file_elem);
-//      if (fileFd != NULL)
     list_remove(ef);
     ef = ef->next;
     free(fileFd);
@@ -262,16 +223,6 @@ open(const char *file) {
     reopened = true;
   }
 
-//  for (int i = 0; i < FILE_LIMIT; i++) {
-//    if (fileFdArray[i].f != NULL) {
-//      if (!strcmp(fileFdArray[i].name, file)) {
-//        reopened = true;
-//        file1 = file_reopen(fileFdArray[i].f);
-//        break;
-//      }
-//    }
-//  }
-
   if (strlen(file) == 0 || file1 == NULL) {
     return EXIT_FAIL;
   }
@@ -281,35 +232,23 @@ open(const char *file) {
     currentFd++;
     lock_release(&wait_lock);
 
-//    struct list_elem *e = list_begin(&cur->file_fd_list);
-      struct fileWithFd *fileFd = (struct fileWithFd *) malloc(sizeof(struct fileWithFd));
-      if (fileFd == NULL) {
-        return EXIT_FAIL;
-      }
-      fileFd->name = file;
-      fileFd->fd = currentFd;
-      fileFd->f = file1;
-      fileFd->tid = cur->tid;
-      fileFd->reopend = reopened;
-      if (fileFd->reopend) {
-        file_reopen(fileFd->f);
-      }
+    struct fileWithFd *fileFd = (struct fileWithFd *) malloc(sizeof(struct fileWithFd));
+    if (fileFd == NULL) {
+      return EXIT_FAIL;
+    }
+    fileFd->name = file;
+    fileFd->fd = currentFd;
+    fileFd->f = file1;
+    fileFd->tid = cur->tid;
+    fileFd->reopend = reopened;
+    if (fileFd->reopend) {
+      file_reopen(fileFd->f);
+    }
 
-      list_push_back(&cur->file_fd_list, &fileFd->file_elem);
-
+    list_push_back(&cur->file_fd_list, &fileFd->file_elem);
   } else {
     return EXIT_FAIL;
   }
-
-//  if (currentFd <= FILE_LIMIT) {
-//    fileFdArray[currentFd-STD_IO].name = file;
-//    fileFdArray[currentFd-STD_IO].fd = currentFd;
-//    fileFdArray[currentFd-STD_IO].f = file1;
-//    tidArray[currentFd-STD_IO] = thread_current()->tid;
-//    reopen[currentFd-STD_IO] = reopened;
-//  } else {
-//    return EXIT_FAIL;
-//  }
 
   file_deny_write(file1);
   return currentFd;
@@ -329,11 +268,6 @@ filesize(int fd) {
     }
     e = e->next;
   }
-
-//  if (fileFdArray[fd-STD_IO].f == NULL) {
-//    exit(EXIT_FAIL);
-//  }
-//  return file_length(fileFdArray[fd-STD_IO].f);
 }
 
 int
@@ -341,9 +275,6 @@ read(int fd, void *buffer, unsigned size) {
   if (fd < STDOUT_FILENO || fd > FILE_LIMIT) {
     exit(EXIT_FAIL);
   }
-//  if (tidArray[fd-STD_IO] != thread_current()->tid) {
-//    exit(EXIT_FAIL);
-//  }
   if (fd == STDIN_FILENO) {
     return input_getc();
   }
@@ -364,15 +295,6 @@ read(int fd, void *buffer, unsigned size) {
     }
     e = e->next;
   }
-
-//  struct file *currentFile = fileFdArray[fd-STD_IO].f;
-//
-//  if (currentFile != NULL) {
-//    int id = file_read(currentFile, buffer, size);
-//    return id;
-//  } else {
-//    exit(EXIT_FAIL);
-//  }
 }
 
 int
@@ -404,20 +326,6 @@ write(int fd, const void *buffer, unsigned size) {
     }
     e = e->next;
   }
-
-
-
-
-//  if (tidArray[fd-STD_IO] != thread_current()->tid || reopen[fd-STD_IO]) {
-////    exit(EXIT_FAIL);
-//  } else {
-//    file_allow_write(fileFdArray[fd-STD_IO].f);
-//  }
-//
-//  int result = file_write(fileFdArray[fd-STD_IO].f, buffer, size);
-//
-//  file_deny_write(fileFdArray[fd-STD_IO].f);
-//  return result;
 }
 
 void
@@ -431,8 +339,6 @@ seek(int fd, unsigned position) {
     }
     e = e->next;
   }
-
-//  file_seek(fileFdArray[fd-STD_IO].f, position);
 }
 
 unsigned
@@ -446,8 +352,6 @@ tell(int fd) {
     }
     e = e->next;
   }
-
-//  return (unsigned int) file_tell(fileFdArray[fd-STD_IO].f);
 }
 
 void
@@ -460,24 +364,12 @@ close(int fd) {
       if (fileFd->f == NULL || fileFd->tid != cur->tid) {
         return;
       }
-        file_close(fileFd->f);
-        list_remove(e);
-        e = e->next;
-        free(fileFd);
+      file_close(fileFd->f);
+      list_remove(e);
+      e = e->next;
+      free(fileFd);
     } else {
       e = e->next;
     }
-
   }
-
-//  if (fileFdArray[fd-STD_IO].f == NULL){
-//    return;
-//  }
-//  if (tidArray[fd-STD_IO] != thread_current()->tid) {
-//    return;
-//  }
-//  if (fd <= FILE_LIMIT) {
-//    file_close(fileFdArray[fd-STD_IO].f);
-//    fileFdArray[fd-STD_IO].f = NULL;
-//  }
 }
