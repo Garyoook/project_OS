@@ -66,21 +66,29 @@ char *fn_copy;
     return EXIT_FAIL;
   }
   sema_init(&child->child_sema, 0);
-  sema_init(&thread_current()->add_entry_for_child, 0);
+  sema_init(&thread_current()->child_entry_sema, 0);
   sema_init(&thread_current()->child_load_sema, 0);
 
   tid = thread_create (command_name, PRI_DEFAULT, start_process, fn_copy);
+
+  sema_down(&thread_current()->child_load_sema);
+
+  if (!thread_current()->load_success) {
+    free(child);
+    return EXIT_FAIL;
+  }
+
+
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
     free(child);
     return EXIT_FAIL;
   }
 
-  sema_down(&thread_current()->child_load_sema);
   child->tid = tid;
   child->exit_status = -1;
   list_push_back(&thread_current()->child_list, &child->child_elem);
-  sema_up(&thread_current()->add_entry_for_child);
+  sema_up(&thread_current()->child_entry_sema);
 
   return tid;
 }
@@ -183,6 +191,7 @@ start_process (void *file_name_)
 {
   char *file_name = file_name_;
   struct intr_frame if_;
+  struct thread *cur = thread_current();
   bool success;
 
   /* Initialize interrupt frame and load executable. */
@@ -200,7 +209,9 @@ start_process (void *file_name_)
 
   success = load (command_name, &if_.eip, &if_.esp);
 
-  sema_up(&thread_current()->parent->child_load_sema);
+  cur->parent->load_success = success;
+
+  sema_up(&cur->parent->child_load_sema);
 
   // if load succeeded we start passing the arguments to the stack:
   if (success) {
@@ -214,7 +225,7 @@ start_process (void *file_name_)
   if (!success)
     thread_exit ();
 
-  sema_down(&thread_current()->parent->add_entry_for_child);
+  sema_down(&thread_current()->parent->child_entry_sema);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in

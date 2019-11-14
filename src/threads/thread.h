@@ -124,9 +124,9 @@ struct thread
   struct list file_fd_list;
   struct file *file_exec;
   int count;
-  struct semaphore sema;
-  struct semaphore add_entry_for_child;
+  struct semaphore child_entry_sema;
   struct semaphore child_load_sema;
+  bool load_success;
   bool in_syscall;
 
 
