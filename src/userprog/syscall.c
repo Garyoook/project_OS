@@ -311,7 +311,9 @@ open(const char *file) {
 
 //    struct list_elem *e = list_begin(&cur->file_fd_list);
       struct fileWithFd *fileFd = (struct fileWithFd *) malloc(sizeof(struct fileWithFd));
-      ASSERT(fileFd);
+      if (fileFd == NULL) {
+        return EXIT_FAIL;
+      }
       fileFd->name = file;
       fileFd->fd = currentFd;
       fileFd->f = file1;

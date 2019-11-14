@@ -50,8 +50,12 @@ char *fn_copy;
   strlcpy(command_name, strtok_r((char *) file_name_copy, " ", &save_ptr), FILE_NAME_LEN_LIMIT);
 
   // check command_name file exists
+  lock_acquire(&wait_lock);
   struct file *file = filesys_open(command_name);
+  lock_release(&wait_lock);
+
   if (file == NULL) {
+    palloc_free_page(fn_copy);
     return EXIT_FAIL;
   }
   file_close(file);
@@ -66,8 +70,11 @@ char *fn_copy;
   sema_init(&thread_current()->child_load_complete, 0);
 
   tid = thread_create (command_name, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
+  if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
+    free(child);
+    return EXIT_FAIL;
+  }
 
   struct thread *t = lookup_tid(tid);
 
@@ -205,6 +212,7 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
+
   if (!success)
     thread_exit ();
 
@@ -234,26 +242,15 @@ process_wait (tid_t child_tid)
 {
   struct thread *t = lookup_tid(child_tid);
   struct thread *cur = thread_current();
-
-//  struct child *child = (struct child *) malloc(sizeof(struct child));
-//  t->parent = thread_current();
-//  child->tid = child_tid;
-//  child->exit_status = 0;
-//  sema_init(&child->child_sema, 0);
-//
-//  list_push_back(&cur->child_list, &child->child_elem);
-//  list_push_back(&cur->child_wait_list, &child->child_elem);
-
-//  enum intr_level old_level;
-//  old_level = intr_disable();
-//  intr_set_level(old_level);
-
   struct list_elem *e = list_begin(&cur->child_list);
+
   while (e != list_end(&cur->child_list)){
     struct child *thr_child = list_entry(e, struct child, child_elem);
+
     if (thr_child->tid == child_tid) {
       sema_down(&thr_child->child_sema);
       list_remove(e);
+
       return thr_child->exit_status;
     }
     e = e->next;
