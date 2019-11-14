@@ -20,7 +20,6 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-int counter = 0;
 
 
 /* Starts a new thread running a user program loaded from
@@ -98,7 +97,7 @@ static void check_stack_overflow(int used);
 // use this to pass and push the arguments to the stack:
 static bool argument_passing(void **esp, char *file_name) {
   current_file_name = malloc(strlen(file_name) + 1);
-//strlcpy(current_file_name, file_name, strlen(file_name) + 1);
+
 // push arguments to the stack;
   enum intr_level old_level;
   old_level = intr_disable();
@@ -249,7 +248,6 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid)
 {
-  struct thread *t = lookup_tid(child_tid);
   struct thread *cur = thread_current();
   struct list_elem *e = list_begin(&cur->child_list);
 
@@ -497,10 +495,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   file_deny_write (file);
 
  done:
-//  if (file != NULL) {
-//    t->file_exec = file;
-//    file_deny_write(file);
-//  }
   /* We arrive here whether the load is successful or not. */
   file_close (file);
   return success;
