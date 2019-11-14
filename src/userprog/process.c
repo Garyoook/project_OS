@@ -66,8 +66,8 @@ static void check_stack_overflow(int used);
 
 // use this to pass and push the arguments to the stack:
 static bool argument_passing(void **esp, char *file_name) {
-current_file_name = malloc(strlen(file_name) + 1);
-strlcpy(current_file_name, file_name, strlen(file_name) + 1);
+//current_file_name = malloc(strlen(file_name) + 1);
+//strlcpy(current_file_name, file_name, strlen(file_name) + 1);
 // push arguments to the stack;
   enum intr_level old_level;
   old_level = intr_disable();
@@ -220,6 +220,7 @@ process_wait (tid_t child_tid)
   sema_init(&child->child_sema, 0);
 
   list_push_back(&cur->child_list, &child->child_elem);
+  list_push_back(&cur->child_wait_list, &child->child_elem);
 
   enum intr_level old_level;
   old_level = intr_disable();
@@ -230,10 +231,7 @@ process_wait (tid_t child_tid)
   while (e != list_end(&cur->child_list)){
     struct child *thr_child = list_entry(e, struct child, child_elem);
     if (thr_child->tid == child_tid) {
-      int result = thr_child->exit_status;
-      list_remove(e);
-      free(thr_child);
-      return result;
+      return thr_child->exit_status;
     }
     e = e->next;
   }
@@ -465,6 +463,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
   success = true;
 
  done:
+//  if (file != NULL) {
+//    t->file_exec = file;
+//    file_deny_write(file);
+//  }
   /* We arrive here whether the load is successful or not. */
   file_close (file);
   return success;

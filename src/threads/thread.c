@@ -521,6 +521,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->parent = NULL;
   t->count = 0;
   list_init(&t->child_list);
+  list_init(&t->child_wait_list);
+  list_init(&t->file_fd_list);
 //  for (int i = 0; i < CHILD_P_NUM; i++){
 //    t->child_process_exit_status[i] = -1;
 //    t->child_process_tid[i] = -1;

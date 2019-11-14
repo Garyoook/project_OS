@@ -120,6 +120,9 @@ struct thread
   struct list locks;
   struct thread *parent;
   struct list child_list;
+  struct list child_wait_list;
+  struct list file_fd_list;
+  struct file *file_exec;
   int count;
   struct semaphore sema;
   bool in_syscall;

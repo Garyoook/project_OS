@@ -13,6 +13,7 @@ struct child {
   struct list_elem child_elem;
 };
 
+
 struct lock wait_lock;
 char *current_file_name;
 
