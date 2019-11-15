@@ -114,7 +114,7 @@ struct thread
 
   struct list locks;                /*lock list to put all locks for processes*/
   struct thread *parent;            /* the thread representing the parent
-                                     * process(if any) f the current process*/
+                                     * process(if any) of the current process*/
 
   struct list child_list;           /* list for all children of this thread*/
   struct list file_fd_list;         /* list for files of this process and

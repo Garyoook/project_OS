@@ -25,8 +25,8 @@ bool safe_access(void const *esp);
 // dealt with all the locks in exit(), keep using it will cause kernel panic;
 void release_all_locks(struct thread *t);
 
-// a struct to keep teack a file with its name, fd, tid and open status.
-struct fileWithFd{
+// a struct to keep track of a file with its name, fd, tid and open status.
+struct fileWithFd {
   struct file *f;
   const char *name;
   int fd;
