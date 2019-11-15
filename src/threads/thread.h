@@ -179,5 +179,14 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+bool compare_priority(const struct list_elem *e1,
+                      const struct list_elem *e2, void *aux);
+int mlfqs_calculatePriority(struct thread *t);
+struct list *get_ready_list(void);
+void upDate_donate_chain(struct thread *t, int new_priority);
+void update_load_avg(void);
+void update_recent_cpu(void);
+void update_BSD(void);
+struct thread* lookup_tid(tid_t tid);
 
 #endif /* threads/thread.h */
