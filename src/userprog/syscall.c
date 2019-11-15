@@ -16,7 +16,7 @@
 #include "threads/malloc.h"
 
 #define FILE_LIMIT 128
-#define STD_IO 2
+#define FD_INIT 2
 
 static void syscall_handler (struct intr_frame *);
 
@@ -36,7 +36,7 @@ struct fileWithFd {
 };
 
 // the initial file descriptor number;
-int currentFd = STD_IO;
+int currentFd = FD_INIT;
 
 void
 syscall_init (void)
