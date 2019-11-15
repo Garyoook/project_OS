@@ -209,6 +209,11 @@ exit (int status) {
     free(fileFd);
   }
 
+  // if exit by an error, release all locks.
+  if (status == EXIT_FAIL) {
+    release_all_locks(thread_current());
+  }
+
   intr_set_level(old_level);
   thread_exit();
 }
