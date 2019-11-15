@@ -17,6 +17,15 @@
 #include "threads/vaddr.h"
 #include "syscall.h"
 
+// a macro to reduce duplicated code in arguments passing;
+#define \
+  PUSH_STACK(esp, from, size) \
+    { \
+        esp = esp - size;\
+        memcpy(esp, from, size);\
+        bytes_used += size;\
+        check_stack_overflow(bytes_used);\
+    };
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -129,52 +138,36 @@ static bool argument_passing(void **esp, char *file_name) {
 
   // push the arguments to the stack;
   for (int i = argc - 1; i >= 0; i--) {
-    *esp = *esp - (strlen(argArr[i]) + 1);
-    memcpy((char *)*esp, argArr[i], strlen(argArr[i]) + 1);
-    bytes_used += strlen(argArr[i] + 1);
-    check_stack_overflow(bytes_used);
+    PUSH_STACK(*esp, argArr[i], (strlen(argArr[i]) + 1));
     addrArr[i] = *esp;
   }
 
-  // Aligning the esp to a nearest multiple of 4 DID NOT IMPLEMENT#
+  // Aligning the esp to a nearest multiple of 4
+  int zero = 0;
   void *addr = (void *) ROUND_DOWN ((uint64_t) *esp , 4);
   size_t addr_diff = ((size_t)*esp - (size_t)addr);
-  *esp = addr;
-  memset(*esp, 0, addr_diff);
-  bytes_used += addr_diff;
-  check_stack_overflow(bytes_used);
+  PUSH_STACK(*esp, &zero, addr_diff);
 
   //push sentinel to the stack
-  *esp = *esp - sizeof (char *);
-  memset (*esp, 0, sizeof (char *));
-  bytes_used += sizeof(char *);
-  check_stack_overflow(bytes_used);
+  PUSH_STACK(*esp, &zero, sizeof(char *))
 
   // push the address of arguments to the stack:
   for (int i = argc - 1; i >= 0; i--) {
-    *esp = *esp - sizeof(char *);
-    memcpy(*esp, &addrArr[i], sizeof(char *));
-    bytes_used += sizeof(char *);
-    check_stack_overflow(bytes_used);
+    PUSH_STACK(*esp, &addrArr[i], sizeof(char *));
   }
   addr_argv = *esp;
 
   // push address of the command name
-  *esp = *esp - sizeof (char **);
-  memcpy(*esp, &addr_argv, sizeof(char **));
-  bytes_used += sizeof(char **);
-  check_stack_overflow(bytes_used);
+  PUSH_STACK(*esp, &addr_argv, sizeof(char **));
 
   //push the argc to the stack:
   *esp = *esp - sizeof (int);
   *(int *)*esp = argc;
 
   // last, the null pointer to the stack.
-  *esp = *esp - sizeof (void *);
+
   void *nullPtr = NULL;
-  memcpy (*esp, &nullPtr, sizeof (void *));
-  bytes_used += sizeof(void *);
-  check_stack_overflow(bytes_used);
+  PUSH_STACK(*esp, &nullPtr, sizeof(void *));
 
   intr_set_level(old_level);
 
@@ -397,7 +390,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    Returns true if successful, false otherwise. */
 
 bool
-load (const char *file_name, void (**eip) (void), void **esp)
+load (const char *cmdline, void (**eip) (void), void **esp)
 {
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
@@ -414,11 +407,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Open executable file. */
   lock_acquire(&wait_lock);
-  file = filesys_open (file_name);
+  file = filesys_open (cmdline);
   lock_release(&wait_lock);
   if (file == NULL)
     {
-      printf ("load: %s: open failed\n", file_name);
+      printf ("load: %s: open failed\n", cmdline);
       goto done;
     }
 
@@ -431,7 +424,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
       || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
       || ehdr.e_phnum > 1024)
     {
-      printf ("load: %s: error loading executable\n", file_name);
+      printf ("load: %s: error loading executable\n", cmdline);
       goto done;
     }
 

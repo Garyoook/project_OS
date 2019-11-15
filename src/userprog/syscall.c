@@ -20,7 +20,6 @@
 
 static void syscall_handler (struct intr_frame *);
 
-bool safe_access(void const *esp);
 // note that we did not use release_all_locks() because we have
 // dealt with all the locks in exit(), keep using it will cause kernel panic;
 void release_all_locks(struct thread *t);
@@ -298,6 +297,7 @@ filesize(int fd) {
     }
     e = e->next;
   }
+  return 0;
 }
 
 int
@@ -325,6 +325,7 @@ read(int fd, void *buffer, unsigned size) {
     }
     e = e->next;
   }
+  return 0;
 }
 
 int
@@ -354,6 +355,7 @@ write(int fd, const void *buffer, unsigned size) {
     }
     e = e->next;
   }
+  return -1;
 }
 
 void
@@ -380,6 +382,7 @@ tell(int fd) {
     }
     e = e->next;
   }
+  return 0;
 }
 
 void
