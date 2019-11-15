@@ -87,10 +87,6 @@ typedef int tid_t;
    blocked state is on a semaphore wait list. */
 
 
-
-#define MAX_LEVEL 8+1  /*Max level of donation*/
-
-#define CHILD_P_NUM 64
 struct thread
 {
     /* Owned by thread.c. */
@@ -99,17 +95,12 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
-    int64_t blocked_ticks;              /* If the thread is blocked, it will be unblock after blocked ticks. */
+    int64_t blocked_ticks;              /* If the thread is blocked, it will
+                                         * be unblock after blocked ticks. */
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-
-//    // self defined: (task 1)
-//    // for priority donation:
-//    int priorities[MAX_LEVEL];          /* An array of int to store priorities that this thread get donated*/
-//    int currentPos;                     /* current position of array priorities;*/
-//    struct thread *donateTo;            /* A pointer to record the thread that this thread donate to*/
 
     // for BSD:
     int nice;
@@ -119,16 +110,30 @@ struct thread
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
-    uint32_t *pagedir;                  /* Page directory. */
-  // user prog;
-  struct list locks;                    /**/
-  struct thread *parent;                /**/
-  struct list child_list;               /**/
-  struct list file_fd_list;             /**/
-  struct semaphore child_entry_sema;    /**/
-  struct semaphore child_load_sema;     /**/
-  bool load_success;                    /**/
-  bool in_syscall;                      /**/
+    uint32_t *pagedir;              /* Page directory. */
+
+  struct list locks;                /*lock list to put all locks for processes*/
+  struct thread *parent;            /* the thread representing the parent
+                                     * process(if any) f the current process*/
+
+  struct list child_list;           /* list for all children of this thread*/
+  struct list file_fd_list;         /* list for files of this process and
+                                     * their corresponding information*/
+
+  struct semaphore child_entry_sema;/* a semaphore to secure synchronization
+                                     * when a child is added to the process's
+                                     * children list*/
+
+  struct semaphore child_load_sema; /* a semaphore to secure synchronization
+                                     * when a child process is being loaded*/
+
+  bool load_success;                /* a bool that a child can pass to its
+                                     * parent during start_process() to decide
+                                     * if we should terminate the execution
+                                     * and return a -1*/
+
+  bool in_syscall;                  /* to indicate the process is running
+                                     * with a system call*/
 #endif
 
     /* Owned by thread.c. */
