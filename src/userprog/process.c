@@ -184,6 +184,7 @@ static bool argument_passing(void **esp, char *file_name) {
 // check that the bytes used does not exceed the limit of stack.
 static void check_stack_overflow(int used) {
   if (used > STACK_LIMIT) {
+    free(current_file_name);
     exit(EXIT_FAIL);
   }
 }
