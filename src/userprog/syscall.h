@@ -32,5 +32,6 @@ int write (int fd, const void *buffer, unsigned size);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
+bool safe_access(void const *esp);
 
 #endif /* userprog/syscall.h */

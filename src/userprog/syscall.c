@@ -52,6 +52,12 @@ bool safe_access(void const *esp) {
     esp != NULL);
 }
 
+void exit_if_unsafe(void const *esp) {
+  if (!safe_access(esp)) {
+    exit(EXIT_FAIL);
+  }
+}
+
 void release_all_locks(struct thread *t){
   struct list_elem *e;
   e = list_begin (&t->locks);
@@ -89,60 +95,59 @@ syscall_handler (struct intr_frame *f UNUSED)
       f->eax = (uint32_t) exec(*(char **)fst);
       break;
     case SYS_CLOSE:
-      if (!safe_access(fst)) exit(EXIT_FAIL);
+      exit_if_unsafe(fst);
       close(*(int *)fst);
       break;
     case SYS_CREATE:
-      if (!safe_access(fst)) exit(EXIT_FAIL);
-      if (!safe_access(snd)) exit(EXIT_FAIL);
+      exit_if_unsafe(fst);
+      exit_if_unsafe(snd);
       f->eax = (uint32_t) create(*(char **)fst, (void *)*(int *)snd);
       break;
     case SYS_EXIT:
-      if (!safe_access(fst)) exit(EXIT_FAIL);
+      exit_if_unsafe(fst);
       exit(*(int*)fst);
       break;
     case SYS_FILESIZE:
-      if (!safe_access(fst)) exit(EXIT_FAIL);
+      exit_if_unsafe(fst);
       f->eax = (uint32_t) filesize(*(int *) fst);
       break;
     case SYS_HALT:
       halt();
     case SYS_OPEN:
-      if (!safe_access(fst)) exit(EXIT_FAIL);
-      if (!safe_access(*(char **)fst)) exit(EXIT_FAIL);
+      exit_if_unsafe(fst);
+      exit_if_unsafe(*(char **)fst);
       f->eax = (uint32_t) open(*(char **)fst);
       break;
     case SYS_READ:
-      if (!safe_access(fst)) exit(EXIT_FAIL);
-      if (!safe_access(snd)) exit(EXIT_FAIL);
-      if (!safe_access(*snd)) exit(EXIT_FAIL);
-      if (!safe_access(trd)) exit(EXIT_FAIL);
+      exit_if_unsafe(fst);
+      exit_if_unsafe(snd);
+      exit_if_unsafe(*snd);
+      exit_if_unsafe(trd);
       f->eax = (uint32_t) read(*(int *)fst, *snd, *(unsigned *) trd);
       break;
     case SYS_WRITE:
-      if (!safe_access(fst)) exit(EXIT_FAIL);
-      if (!safe_access(snd)) exit(EXIT_FAIL);
-      if (!safe_access(*snd)) exit(EXIT_FAIL);
-      if (!safe_access(trd)) exit(EXIT_FAIL);
+      exit_if_unsafe(fst);
+      exit_if_unsafe(snd);
+      exit_if_unsafe(*snd);
+      exit_if_unsafe(trd);
       f->eax = (uint32_t) write(*(int *)fst, *snd, *(unsigned *) trd);
       break;
     case SYS_WAIT:
-      if (!safe_access(fst)) exit(EXIT_FAIL);
+      exit_if_unsafe(fst);
       f->eax = (uint32_t) wait(*(pid_t *)fst);
       break;
     case SYS_REMOVE:
-      if (!safe_access(fst)) exit(EXIT_FAIL);
-      if (!safe_access(*(char **)fst)) exit(EXIT_FAIL);
-
+      exit_if_unsafe(fst);
+      exit_if_unsafe(*(char **)fst);
       f->eax = (uint32_t) remove(*(const char **) fst);
       break;
     case SYS_SEEK:
-      if (!safe_access(fst)) exit(EXIT_FAIL);
-      if (!safe_access(snd)) exit(EXIT_FAIL);
+      exit_if_unsafe(fst);
+      exit_if_unsafe(snd);
       seek(*(int *) fst, *(unsigned int *) snd);
       break;
     case SYS_TELL:
-      if (!safe_access(fst)) exit(EXIT_FAIL);
+      exit_if_unsafe(fst);
       f->eax = tell(*(int *) fst);
       break;
     default:break;
