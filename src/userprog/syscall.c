@@ -40,7 +40,7 @@ int currentFd = FD_INIT;
 void
 syscall_init (void)
 {
-  lock_init(&wait_lock);
+  lock_init(&syscall_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -239,7 +239,9 @@ remove(const char *file) {
 int
 open(const char *file) {
   bool reopened = false;
+  lock_acquire(&syscall_lock);
   struct file *file1 = filesys_open(file);
+  lock_release(&syscall_lock);
   struct thread *cur = thread_current();
 
   if (!strcmp(file, cur->name)) {
@@ -254,19 +256,20 @@ open(const char *file) {
   }
 
   if (currentFd <= FILE_LIMIT) {
-    lock_acquire(&wait_lock);
+    lock_acquire(&syscall_lock);
     currentFd++;
-    lock_release(&wait_lock);
 
     // initialize the fields of a created file and push it into
     // the file list of current thread.
     struct fileWithFd *fileFd =
         (struct fileWithFd *) malloc(sizeof(struct fileWithFd));
     if (fileFd == NULL) {
+      lock_release(&syscall_lock);
       return EXIT_FAIL;
     }
     fileFd->name = file;
     fileFd->fd = currentFd;
+    lock_release(&syscall_lock);
     fileFd->f = file1;
     fileFd->tid = cur->tid;
     fileFd->reopened = reopened;

@@ -14,7 +14,7 @@ struct child {
 };
 
 
-struct lock wait_lock;
+struct lock syscall_lock;
 char *current_file_name;
 
 void syscall_init (void);

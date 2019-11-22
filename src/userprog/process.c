@@ -21,10 +21,10 @@
 #define \
   PUSH_STACK(esp, from, size) \
     { \
+        check_stack_overflow(bytes_used);\
         esp = esp - size;\
         memcpy(esp, from, size);\
         bytes_used += size;\
-        check_stack_overflow(bytes_used);\
     };
 
 static thread_func start_process NO_RETURN;
@@ -60,9 +60,9 @@ char *fn_copy;
       FILE_NAME_LEN_LIMIT);
 
   // add lock to prevent synchronization problems in filesys operation.
-  lock_acquire(&wait_lock);
+  lock_acquire(&syscall_lock);
   struct file *file = filesys_open(command_name);
-  lock_release(&wait_lock);
+  lock_release(&syscall_lock);
 
   // check command_name file exists
   if (file == NULL) {
@@ -99,7 +99,8 @@ char *fn_copy;
   child->tid = tid;
   child->exit_status = -1;
   list_push_back(&thread_current()->child_list, &child->child_elem);
-  // inform the parent that the child has been added into the list.
+
+  // inform the parent that the child has been added into the list. So
   sema_up(&thread_current()->child_entry_sema);
 
   return tid;
@@ -123,7 +124,7 @@ static bool argument_passing(void **esp, char *file_name) {
   int bytes_used = 0;
 
   char *token, *save_ptr;
-  int argc= 0;
+  int argc = 0;
 
   char *argArr[ARGC];
   void *addrArr[ARGC];
@@ -165,7 +166,6 @@ static bool argument_passing(void **esp, char *file_name) {
   *(int *)*esp = argc;
 
   // last, the null pointer to the stack.
-
   void *nullPtr = NULL;
   PUSH_STACK(*esp, &nullPtr, sizeof(void *));
 
@@ -406,9 +406,9 @@ load (const char *cmdline, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
-  lock_acquire(&wait_lock);
+  lock_acquire(&syscall_lock);
   file = filesys_open (cmdline);
-  lock_release(&wait_lock);
+  lock_release(&syscall_lock);
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", cmdline);
