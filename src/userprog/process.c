@@ -16,6 +16,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "syscall.h"
+#include "vm/frame.h"
 
 // a macro to reduce duplicated code in arguments passing;
 #define \
@@ -404,6 +405,7 @@ load (const char *cmdline, void (**eip) (void), void **esp)
   if (t->pagedir == NULL)
     goto done;
   process_activate ();
+  frame_create(t->pagedir);
 
   /* Open executable file. */
   lock_acquire(&syscall_lock);

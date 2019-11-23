@@ -1,13 +1,14 @@
 //
 // Created by cl10418 on 23/11/19.
 //
-#include <palloc.h>
+#include "vm/frame.h"
+#include "threads/palloc.h"
 #include <debug.h>
 #include "lib/kernel/list.h"
-#include <thread.h>
+#include "threads/thread.h"
 #include <string.h>
 
-void frame_evict(void)
+void frame_evict(void);
 
 struct list *frame_table;
 struct frame_entry
