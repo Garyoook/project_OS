@@ -5,6 +5,8 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "syscall.h"
+#include "vm/frame.h"
+#include "vm/page.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -146,6 +148,12 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
+
+  struct sub_page_table_entry *s_page = lookup_page(fault_addr);
+  if (s_page->all_zero_page || s_page->in_swap_slot || s_page->in_file_sys) {
+    struct frame_entry *frame = frame_create(fault_addr);
+    pa
+  }
 
   if (thread_current()->in_syscall) {
     exit(EXIT_FAIL);

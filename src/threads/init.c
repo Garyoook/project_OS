@@ -23,6 +23,8 @@
 #include "threads/pte.h"
 #include "threads/thread.h"
 #include "vm/frame.h"
+#include "vm/page.h"
+
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "userprog/exception.h"
@@ -91,6 +93,7 @@ main (void)
   thread_init ();
   console_init ();
   frame_table_init();
+  sub_page_table_init();
 
   /* Greet user. */
   printf ("Pintos booting with %'"PRIu32" kB RAM...\n",
