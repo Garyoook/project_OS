@@ -3,6 +3,8 @@
 #include <syscall-nr.h>
 #include <user/syscall.h>
 #include <string.h>
+#include <sys/user.h>
+#include "vm/page.h"
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
 #include "threads/interrupt.h"
@@ -17,6 +19,7 @@
 
 #define FILE_LIMIT 128
 #define FD_INIT 2
+#define MD_INIT 0
 
 static void syscall_handler (struct intr_frame *);
 
@@ -36,6 +39,7 @@ struct fileWithFd {
 
 // the initial file descriptor number;
 int currentFd = FD_INIT;
+int currentMd = MD_INIT;
 
 void
 syscall_init (void)
@@ -406,4 +410,44 @@ close(int fd) {
       e = e->next;
     }
   }
+}
+
+mapid_t mmap(int fd, void *addr)
+{
+  int file_size = filesize(fd);
+  int md = currentMd;
+  if (fd == 0 || fd == 1 || file_size == 0 || addr == 0 || (uint32_t)addr % PGSIZE != 0) {
+    return -1;
+  }
+
+  int page_no = file_size / PGSIZE;
+  int zero_set = file_size % PGSIZE;
+
+  // to check no overlapping
+  for (int a = 0; a < page_no; a++) {
+    if (lookup_page((uint32_t *)addr + a) != NULL) {
+      return -1;
+    }
+  }
+
+  struct thread *cur = thread_current();
+  struct list_elem *e = list_begin(&cur->file_fd_list);
+  while (e != list_end(&cur->file_fd_list)) {
+    struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
+    if (fileFd->fd == fd) {
+      if (fileFd->f == NULL || fileFd->tid != cur->tid) {
+        return -1;
+      }
+
+      file_read(fileFd->f, addr, file_size);
+
+      if (zero_set != 0) {
+        //find the address of ending of the file
+        memset(addr + file_size, 0, (size_t)PGSIZE - zero_set);
+      }
+      currentMd++;
+    }
+  }
+
+  return md;
 }
