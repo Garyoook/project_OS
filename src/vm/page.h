@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "kernel/list.h"
 
 
 struct sub_page_table_entry {

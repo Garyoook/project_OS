@@ -3,7 +3,6 @@
 #include <syscall-nr.h>
 #include <user/syscall.h>
 #include <string.h>
-#include <sys/user.h>
 #include "vm/page.h"
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
