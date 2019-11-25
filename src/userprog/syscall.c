@@ -32,6 +32,8 @@ struct fileWithFd {
   struct file *f;
   const char *name;
   int fd;
+  int md;
+  void *md_addr;
   tid_t tid;
   bool reopened;
   struct list_elem file_elem;
@@ -412,11 +414,10 @@ close(int fd) {
   }
 }
 
-mapid_t mmap(int fd, void *addr)
-{
+mapid_t mmap(int fd, void *addr) {
   int file_size = filesize(fd);
   int md = currentMd;
-  if (fd == 0 || fd == 1 || file_size == 0 || addr == 0 || (uint32_t)addr % PGSIZE != 0) {
+  if (fd == 0 || fd == 1 || file_size == 0 || addr == 0 || (uint32_t) addr % PGSIZE != 0) {
     return -1;
   }
 
@@ -425,7 +426,7 @@ mapid_t mmap(int fd, void *addr)
 
   // to check no overlapping
   for (int a = 0; a < page_no; a++) {
-    if (lookup_page((uint32_t *)addr + a) != NULL) {
+    if (lookup_page((uint32_t *) addr + a) != NULL) {
       return -1;
     }
   }
@@ -439,15 +440,36 @@ mapid_t mmap(int fd, void *addr)
         return -1;
       }
 
-      file_read(fileFd->f, addr, file_size);
+      read(fileFd->fd, addr, (unsigned) file_size);
 
       if (zero_set != 0) {
         //find the address of ending of the file
-        memset(addr + file_size, 0, (size_t)PGSIZE - zero_set);
+        memset(addr + file_size, 0, (size_t) PGSIZE - zero_set);
       }
+      fileFd->md = currentMd;
+      fileFd->md_addr = addr;
       currentMd++;
+    } else {
+      e = e -> next;
     }
   }
-
   return md;
+}
+
+void munmap(mapid_t mapping)
+{
+  struct thread *cur = thread_current();
+  struct list_elem *e = list_begin(&cur->file_fd_list);
+  while (e != list_end(&cur->file_fd_list)) {
+    struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
+    if (fileFd->md == mapping) {
+      if (fileFd->f == NULL || fileFd->tid != cur->tid) {
+        return;
+      }
+      //not sure!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      pagedir_destroy(fileFd->md_addr);
+    } else {
+      e = e -> next;
+    }
+  }
 }
