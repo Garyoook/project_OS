@@ -7,37 +7,60 @@
 #include "page.h"
 #include "lib/kernel/list.h"
 #include "threads/malloc.h"
+#include "kernel/hash.h"
+#include "vaddr.h"
 
-struct list sup_page_table;
+static struct hash spt_hash_table;
 
-void sub_page_table_init() {
-  list_init(&sup_page_table);
+
+
+unsigned
+page_hash (const struct hash_elem *e, void *aux UNUSED)
+{
+  const struct spt_entry *p = hash_entry (e, struct spt_entry, hash_elem);
+  return hash_bytes (&p->upage, sizeof p->upage);
 }
 
-void page_create(uint32_t *vaddr) {
-  struct spt_entry *page = malloc(sizeof(struct spt_entry));
-  if (page == NULL) {
-    return;
-  }
-  page->in_file_sys = true;
-  page->in_swap_slot = false;
-  page->all_zero_page = false;
-  page->page = vaddr;
+/* Returns true if page a precedes page b. */
+bool
+page_less (const struct hash_elem *a, const struct hash_elem *b,
+           void *aux UNUSED)
+{
+  const struct spt_entry *p1 = hash_entry (a, struct spt_entry, hash_elem);
+  const struct spt_entry *p2 = hash_entry (b, struct spt_entry, hash_elem);
 
-  list_push_back(&sup_page_table, &page->sub_page_elem);
+  return p1->upage < p2->upage;
+}
+
+void sub_page_table_init() {
+  hash_init(&spt_hash_table, page_hash, page_less, NULL);
+}
+
+
+bool page_create(uint32_t *vaddr, struct file *file, enum page_status status, bool writable, off_t offset) {
+  struct spt_entry *page = (struct spt_entry *) malloc(sizeof(struct spt_entry));
+  if (page == NULL) {
+    return false;
+  }
+  page->upage = vaddr;
+  page->status = status;
+  page->file = file;
+  page->writtable = writable;
+  page->offset = offset;
+  return true;
 }
 
 struct spt_entry * lookup_page(const uint32_t *vaddr) {
-  struct list_elem * e = list_pop_front(&sup_page_table);
-  while (e != list_end(&sup_page_table)) {
-    struct spt_entry *page = list_entry(e, struct sub_page_table_entry, sub_page_elem);
-    if(page->page == vaddr) {
-      return page;
-    }
-
-    e = e->next;
+  struct spt_entry *page= malloc(sizeof(struct spt_entry));
+  page->upage = vaddr;
+  struct hash_elem *e = hash_find(&spt_hash_table, &page->hash_elem);
+  free(page);
+  if(e){
+    return hash_entry(e,struct spt_entry, hash_elem);
   }
-}
+  return NULL;
+  }
+
 
 
 

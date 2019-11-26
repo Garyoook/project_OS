@@ -11,21 +11,27 @@
 #include "kernel/list.h"
 #include "filesys/off_t.h"
 
+enum page_status {
+  IN_FRAME_TABLE,
+  IN_SWAP_SLOT,
+  IN_FILESYS,
+  ALL_ZERO
+};
 
 struct spt_entry {
-  uint32_t *page;
-  bool in_file_sys;
-  bool in_swap_slot;
-  bool all_zero_page;
-  struct list_elem sub_page_elem;
-  struct hash_elem hash_elem;
+  uint32_t *upage;
+  enum page_status status;
   struct file *file;
   off_t offset;
   bool writtable;
+  struct hash_elem hash_elem;
+  struct list_elem sub_page_elem;
 };
 
+
+
 void sub_page_table_init();
-void page_create(uint32_t *vaddr);
+bool page_create(uint32_t *vaddr, struct file *file, enum page_status status, bool writable, off_t offset);
 struct spt_entry * lookup_page(const uint32_t *vaddr);
 
 #endif //PINTOS_47_PAGE_H
