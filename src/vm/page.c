@@ -8,30 +8,30 @@
 #include "lib/kernel/list.h"
 #include "threads/malloc.h"
 
-struct list sub_page_table;
+struct list sup_page_table;
 
 void sub_page_table_init() {
-  list_init(&sub_page_table);
+  list_init(&sup_page_table);
 }
 
 void page_create(uint32_t *vaddr) {
-  struct sub_page_table_entry *page = malloc(sizeof(struct sub_page_table_entry));
+  struct spt_entry *page = malloc(sizeof(struct spt_entry));
   if (page == NULL) {
     return;
   }
   page->in_file_sys = true;
   page->in_swap_slot = false;
   page->all_zero_page = false;
-  page->vaddr = vaddr;
+  page->page = vaddr;
 
-  list_push_back(&sub_page_table, &page->sub_page_elem);
+  list_push_back(&sup_page_table, &page->sub_page_elem);
 }
 
-struct sub_page_table_entry * lookup_page(const uint32_t *vaddr) {
-  struct list_elem * e = list_pop_front(&sub_page_table);
-  while (e != list_end(&sub_page_table)) {
-    struct sub_page_table_entry *page = list_entry(e, struct sub_page_table_entry, sub_page_elem);
-    if(page->vaddr == vaddr) {
+struct spt_entry * lookup_page(const uint32_t *vaddr) {
+  struct list_elem * e = list_pop_front(&sup_page_table);
+  while (e != list_end(&sup_page_table)) {
+    struct spt_entry *page = list_entry(e, struct sub_page_table_entry, sub_page_elem);
+    if(page->page == vaddr) {
       return page;
     }
 
