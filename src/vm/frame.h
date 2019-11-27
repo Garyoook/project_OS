@@ -7,10 +7,13 @@
 
 #include <stdint.h>
 #include "lib/kernel/list.h"
+#include "filesys/off_t.h"
 
 struct frame_entry
 {
   uint32_t *page;
+  off_t offset;
+  struct file *file;
   struct thread *td;
   struct list_elem elem;
 };
