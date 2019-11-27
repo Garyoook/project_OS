@@ -48,6 +48,7 @@ bool page_create(uint32_t *vaddr, struct file *file, enum page_status status, bo
   page->file = file;
   page->writtable = writable;
   page->offset = offset;
+  hash_insert(thread_current()->spt_hash_table, &page->hash_elem);
   return true;
 }
 
