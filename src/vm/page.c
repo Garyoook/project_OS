@@ -8,7 +8,7 @@
 #include "lib/kernel/list.h"
 #include "threads/malloc.h"
 #include "kernel/hash.h"
-#include "vaddr.h"
+#include "threads/vaddr.h"
 
 static struct hash spt_hash_table;
 

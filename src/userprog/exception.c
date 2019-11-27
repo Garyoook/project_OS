@@ -149,10 +149,10 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  struct spt_entry *s_page = lookup_page(fault_addr);
-  if (s_page->all_zero_page || s_page->in_swap_slot || s_page->in_file_sys) {
-    struct frame_entry *frame = frame_create(fault_addr);
-  }
+//  struct spt_entry *s_page = lookup_page(fault_addr);
+//  if (s_page->all_zero_page || s_page->in_swap_slot || s_page->in_file_sys) {
+//    struct frame_entry *frame = frame_create(fault_addr);
+//  }
 
   if (thread_current()->in_syscall) {
     exit(EXIT_FAIL);

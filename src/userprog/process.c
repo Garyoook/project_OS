@@ -406,8 +406,6 @@ load (const char *cmdline, void (**eip) (void), void **esp)
   if (t->pagedir == NULL)
     goto done;
   process_activate ();
-  frame_create(t->pagedir);
-  page_create(t->pagedir);
 
   /* Open executable file. */
   lock_acquire(&syscall_lock);
@@ -497,6 +495,10 @@ load (const char *cmdline, void (**eip) (void), void **esp)
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
+
+
+  frame_create(t->pagedir);
+  page_create(t->pagedir, file, ALL_ZERO, true, file_ofs);
 
   success = true;
 
