@@ -189,6 +189,11 @@ static void check_stack_overflow(int used) {
 static void
 start_process (void *file_name_)
 {
+  struct hash *haha = malloc(sizeof(struct hash));
+  thread_current()->spt_hash_table = haha;
+  hash_init(thread_current()->spt_hash_table, &page_hash, &page_less, NULL);
+
+
   char *file_name = file_name_;
   struct intr_frame if_;
   struct thread *cur = thread_current();
@@ -226,6 +231,7 @@ start_process (void *file_name_)
     thread_exit ();
 
   sema_down(&thread_current()->parent->child_entry_sema);
+
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in

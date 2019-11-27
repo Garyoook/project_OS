@@ -136,6 +136,8 @@ struct thread
                                      * with a system call*/
 #endif
 
+    struct hash *spt_hash_table;
+
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
 };

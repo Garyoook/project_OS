@@ -154,6 +154,11 @@ syscall_handler (struct intr_frame *f UNUSED)
       exit_if_unsafe(fst);
       f->eax = tell(*(int *) fst);
       break;
+    case SYS_MMAP:
+      exit_if_unsafe(fst);
+      exit_if_unsafe(snd);
+      f->eax = (uint32_t)mmap(*(int *)fst, *snd);
+      break;
     default:break;
   }
 }
@@ -414,6 +419,7 @@ close(int fd) {
 }
 
 mapid_t mmap(int fd, void *addr) {
+  printf("AAAAAAAAA\n");
   int file_size = filesize(fd);
   int md = currentMd;
   if (fd == 0 || fd == 1 || file_size == 0 || addr == 0 || (uint32_t) addr % PGSIZE != 0) {

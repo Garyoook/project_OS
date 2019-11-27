@@ -28,7 +28,12 @@ struct spt_entry {
   struct list_elem sub_page_elem;
 };
 
+unsigned
+page_hash (const struct hash_elem *e, void *aux);
 
+bool
+page_less (const struct hash_elem *a, const struct hash_elem *b,
+           void *aux);
 
 void sub_page_table_init();
 bool page_create(uint32_t *vaddr, struct file *file, enum page_status status, bool writable, off_t offset);

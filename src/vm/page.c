@@ -3,6 +3,7 @@
 //
 
 #include <stdbool.h>
+#include "threads/thread.h"
 #include "threads/palloc.h"
 #include "page.h"
 #include "lib/kernel/list.h"
@@ -10,7 +11,7 @@
 #include "kernel/hash.h"
 #include "threads/vaddr.h"
 
-static struct hash spt_hash_table;
+
 
 
 
@@ -33,7 +34,7 @@ page_less (const struct hash_elem *a, const struct hash_elem *b,
 }
 
 void sub_page_table_init() {
-  hash_init(&spt_hash_table, page_hash, page_less, NULL);
+  hash_init(thread_current()->spt_hash_table, &page_hash, &page_less, NULL);
 }
 
 
@@ -53,7 +54,7 @@ bool page_create(uint32_t *vaddr, struct file *file, enum page_status status, bo
 struct spt_entry * lookup_page(const uint32_t *vaddr) {
   struct spt_entry *page= malloc(sizeof(struct spt_entry));
   page->upage = vaddr;
-  struct hash_elem *e = hash_find(&spt_hash_table, &page->hash_elem);
+  struct hash_elem *e = hash_find(thread_current()->spt_hash_table, &page->hash_elem);
   free(page);
   if(e){
     return hash_entry(e,struct spt_entry, hash_elem);
