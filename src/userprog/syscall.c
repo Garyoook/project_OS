@@ -3,19 +3,20 @@
 #include <syscall-nr.h>
 #include <user/syscall.h>
 #include <string.h>
+#include "vm/frame.h"
 #include "threads/palloc.h"
 #include "vm/page.h"
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-#include "process.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "pagedir.h"
 #include "threads/synch.h"
 #include "devices/input.h"
 #include "threads/malloc.h"
+#include "process.h"
 
 #define FILE_LIMIT 128
 #define FD_INIT 2
@@ -32,9 +33,13 @@ struct fileWithFd {
   struct file *f;
   const char *name;
   int fd;
+
   int md;
   void *md_addr;
+  int file_size;
+  off_t file_pos;
   tid_t tid;
+  bool mmaped;
   bool reopened;
   struct list_elem file_elem;
 };
@@ -289,6 +294,7 @@ open(const char *file) {
     fileFd->f = file1;
     fileFd->tid = cur->tid;
     fileFd->reopened = reopened;
+    fileFd->mmaped =false;
     if (fileFd->reopened) {
       file_reopen(fileFd->f);
     }
@@ -372,8 +378,20 @@ write(int fd, const void *buffer, unsigned size) {
         if (!fileFd->reopened)
           file_allow_write(fileFd->f);
       }
-      int result = file_write(fileFd->f, buffer, size);
+
+      int result;
+      if (fileFd->mmaped) {
+        uint32_t *kaddr = pagedir_get_page(cur->pagedir, fileFd->md_addr);
+        //printf("Q\n");
+        memcpy(kaddr + fileFd->file_pos, buffer, size);
+        //printf("W\n");
+        // may overflow
+        return size;
+      } else {
+        result = file_write(fileFd->f, buffer, size);
+      }
       file_deny_write(fileFd->f);
+
       return result;
     }
     e = e->next;
@@ -388,7 +406,11 @@ seek(int fd, unsigned position) {
   while (e != list_end(&cur->file_fd_list)){
     struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
     if (fileFd->fd == fd ) {
-      file_seek(fileFd->f, position);
+      if (fileFd->mmaped) {
+        fileFd->file_pos = position;
+      } else {
+        file_seek(fileFd->f, position);
+      }
     }
     e = e->next;
   }
@@ -401,7 +423,11 @@ tell(int fd) {
   while (e != list_end(&cur->file_fd_list)){
     struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
     if (fileFd->fd == fd ) {
-      return (unsigned int) file_tell(fileFd->f);
+      if (fileFd->mmaped) {
+        return (unsigned)fileFd->file_pos;
+      } else {
+        return (unsigned int) file_tell(fileFd->f);
+      }
     }
     e = e->next;
   }
@@ -429,28 +455,29 @@ close(int fd) {
 }
 
 mapid_t mmap(int fd, void *addr) {
-
   int file_size = filesize(fd);
-  int md = currentMd;
   if (fd == 0 || fd == 1 || file_size == 0 || addr == 0 || (uint32_t) addr % PGSIZE != 0) {
     return -1;
   }
 
-  int page_no = file_size / PGSIZE;
-  int zero_set = file_size % PGSIZE;
+  int page_no = ((uint32_t)file_size) / PGSIZE;
+  uint32_t zero_set = ((uint32_t)file_size)  % PGSIZE;
+  off_t file_read_byte;
 
   // to check no overlapping
   for (int a = 0; a < page_no; a++) {
-    if (lookup_page((uint32_t *) addr + a) != NULL) {
+    if (pagedir_get_page(thread_current()->pagedir, addr + (uint32_t )(page_no * PGSIZE)) != NULL){
+        //lookup_page((uint32_t *) addr + a) != NULL) {
+      //?
       return -1;
     }
   }
 
-  void *kaddr = palloc_get_page(PAL_ZERO);
+  void *kaddr = palloc_get_page(PAL_USER);
+  if (kaddr == NULL)
+    return -1;
 
   struct thread *cur = thread_current();
-
-  uint32_t *pd = cur->pagedir;
   struct list_elem *e = list_begin(&cur->file_fd_list);
   while (e != list_end(&cur->file_fd_list)) {
     struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
@@ -459,25 +486,37 @@ mapid_t mmap(int fd, void *addr) {
         return -1;
       }
 
-      //didnt use addr
-      page_create(kaddr, fileFd->f, ALL_ZERO, true, 0);
-      read(fileFd->fd, kaddr, (unsigned) file_size);
+      page_create(kaddr, fileFd->f, ALL_ZERO, false, 0);
+      file_read_byte = file_read(fileFd->f, kaddr, file_size);
 
+      if (file_read_byte != file_size) {
+        palloc_free_page(kaddr);
+        return -1;
+      }
 
       if (zero_set != 0) {
         //find the address of ending of the file
         memset(kaddr + file_size, 0, (size_t) PGSIZE - zero_set);
       }
 
-      pagedir_set_page(pd, addr, kaddr, false);
+      if ( !(pagedir_get_page (cur->pagedir, addr) == NULL
+            && pagedir_set_page (cur->pagedir, addr, kaddr, false))) {
+        palloc_free_page(kaddr);
+        return -1;
+      }
+      addr += PGSIZE;
 
       fileFd->md = currentMd;
       fileFd->md_addr = addr;
+      fileFd->mmaped = true;
       currentMd++;
+      fileFd->file_size = file_size;
+      fileFd->file_pos = file_tell(fileFd->f);
+      return fileFd->md;
     }
       e = e -> next;
   }
-  return md;
+  return -1;
 }
 
 void munmap(mapid_t mapping)
@@ -490,11 +529,17 @@ void munmap(mapid_t mapping)
       if (fileFd->f == NULL || fileFd->tid != cur->tid) {
         return;
       }
-      //not sure!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      pagedir_destroy(fileFd->md_addr);
-    } else {
-      e = e -> next;
+      if (fileFd->md_addr == NULL)
+        return;
+
+      if (!fileFd->reopened)
+        file_allow_write(fileFd->f);
+
+      off_t r = file_write_at(fileFd->f, pagedir_get_page(cur->pagedir, fileFd->md_addr), fileFd->file_size, 0);
+      pagedir_clear_page(cur->pagedir, fileFd->md_addr);
+      page_destroy(fileFd->md_addr);
     }
+    e = e->next;
   }
 }
 

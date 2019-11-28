@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include "lib/kernel/list.h"
 #include "filesys/off_t.h"
+#include "page.h"
 
 struct frame_entry
 {
@@ -16,6 +17,7 @@ struct frame_entry
   struct file *file;
   struct thread *td;
   struct list_elem elem;
+  struct spt_entry* spt;
 };
 
 void frame_table_init(void);

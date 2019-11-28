@@ -205,6 +205,6 @@ page_fault (struct intr_frame *f)
 
 void safe_exit() {
   free(thread_current()->spt_hash_table);
-  exit(EXIT_FAIL);
+  exit(-1);
 }
 

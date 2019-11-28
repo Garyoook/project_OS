@@ -39,5 +39,6 @@ page_less (const struct hash_elem *a, const struct hash_elem *b,
 void sub_page_table_init();
 bool page_create(uint32_t *vaddr, struct file *file, enum page_status status, bool writable, off_t offset);
 struct spt_entry * lookup_page(uint32_t *vaddr);
+void page_destroy(uint32_t *vaddr);
 
 #endif //PINTOS_47_PAGE_H
