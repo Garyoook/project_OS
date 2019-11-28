@@ -51,15 +51,23 @@ bool page_create(uint32_t *vaddr, struct file *file, enum page_status status, bo
 
 struct spt_entry * lookup_page(uint32_t *vaddr) {
   struct spt_entry *page= malloc(sizeof(struct spt_entry));
-  page->upage = vaddr;
+  page->upage = pg_round_down(vaddr);
   struct hash_elem *e = hash_find(thread_current()->spt_hash_table, &page->hash_elem);
   free(page);
   if(e){
     return hash_entry(e,struct spt_entry, hash_elem);
   }
   return NULL;
-  }
+}
 
+void page_destroy(uint32_t *vaddr) {
+  struct spt_entry *page = lookup_page(vaddr);
+  if (!page) {
+    return;
+  }
+  hash_delete(thread_current()->spt_hash_table, &page->hash_elem);
+  free(page);
+}
 
 
 
