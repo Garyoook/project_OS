@@ -1,8 +1,8 @@
 #ifndef THREADS_SYNCH_H
 #define THREADS_SYNCH_H
 
-#include <list.h>
-#include <stdbool.h>
+#include<list.h>
+#include<stdbool.h>
 
 /* A counting semaphore. */
 struct semaphore 
@@ -22,6 +22,9 @@ struct lock
   {
     struct thread *holder;      /* Thread holding lock (for debugging). */
     struct semaphore semaphore; /* Binary semaphore controlling access. */
+
+// userProg
+  struct list_elem lockElem;
   };
 
 void lock_init (struct lock *);
@@ -40,6 +43,8 @@ void cond_init (struct condition *);
 void cond_wait (struct condition *, struct lock *);
 void cond_signal (struct condition *, struct lock *);
 void cond_broadcast (struct condition *, struct lock *);
+bool compare_priority_sema(const struct list_elem *e1,
+                           const struct list_elem *e2, void *aux);
 
 /* The limitation of depth of nested priority donation. */
 #define NESTED_PRIORITY_DONATION_DEPTH 8

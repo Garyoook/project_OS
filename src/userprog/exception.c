@@ -4,12 +4,18 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "syscall.h"
+#include "vm/frame.h"
+#include "vm/page.h"
+#include "threads/malloc.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
+
+void safe_exit();
 
 /* Registers handlers for interrupts that can be caused by user
    programs.
@@ -139,14 +145,37 @@ page_fault (struct intr_frame *f)
   /* Turn interrupts back on (they were only off so that we could
      be assured of reading CR2 before it changed). */
   intr_enable ();
-
   /* Count page faults. */
   page_fault_cnt++;
-
   /* Determine cause. */
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
+
+  struct spt_entry *s_page = lookup_page(fault_addr);
+
+  if (s_page == NULL) {
+    safe_exit();
+  }
+
+  // to see if the page is writable;
+  if (((uint32_t) fault_addr & (1 << 1)) == 0) {
+   // safe_exit();
+  }
+
+  if (s_page->status == ALL_ZERO || s_page->status == IN_SWAP_SLOT || s_page->status == IN_FILESYS) {
+    struct frame_entry *frame = frame_create(fault_addr);
+    frame->page = s_page->upage;
+    frame->file = s_page->file;
+    frame->offset = s_page->offset;
+
+  }
+
+  if (thread_current()->in_syscall) {
+    //exit(EXIT_FAIL);
+  } else if (!user) {
+    kill(f);
+  }
 
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
@@ -157,5 +186,10 @@ page_fault (struct intr_frame *f)
           write ? "writing" : "reading",
           user ? "user" : "kernel");
   kill (f);
+}
+
+void safe_exit() {
+  free(thread_current()->spt_hash_table);
+  exit(-1);
 }
 

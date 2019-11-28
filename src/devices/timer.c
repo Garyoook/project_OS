@@ -87,7 +87,8 @@ timer_elapsed (int64_t then)
 }
 
 /* Returns true if ticks for t1 is smaller than ticks for t2 */
-bool compare_thread(const struct list_elem *e1, const struct list_elem *e2, void *U)
+bool compare_thread(const struct list_elem *e1,
+    const struct list_elem *e2, void *aux UNUSED)
 {
   struct thread *t1 = list_entry(e1, struct thread, elem); 
   struct thread *t2 = list_entry(e2, struct thread, elem);
@@ -101,14 +102,15 @@ timer_sleep (int64_t ticks)
 {
   int64_t start = timer_ticks ();
   ASSERT (intr_get_level () == INTR_ON);
-  
+
   enum intr_level old_level;
   int64_t estimate_ticks = ticks + start;
   struct thread *cur = thread_current();
-  
+
   set_thread_blocked_ticks(cur, estimate_ticks);
-  list_insert_ordered(&blocked_list, &thread_current()->elem, compare_thread, NULL);
-  
+  list_insert_ordered(&blocked_list, &thread_current()->elem,
+      compare_thread, NULL);
+
   old_level = intr_disable ();
   thread_block();
   intr_set_level (old_level);
@@ -190,6 +192,13 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   unblock_thread_with_enough_ticks(ticks);
+  struct thread* curr = thread_current();
+
+  /*added in timer.c to count the increment of recent_cpu. */
+  if (curr->status == THREAD_RUNNING) {
+    curr->recent_cpu = fp_add_fp_and_int(curr->recent_cpu, 1);
+  }
+
   thread_tick ();
 }
 
