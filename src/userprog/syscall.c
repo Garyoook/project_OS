@@ -3,6 +3,7 @@
 #include <syscall-nr.h>
 #include <user/syscall.h>
 #include <string.h>
+#include "threads/palloc.h"
 #include "vm/page.h"
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
@@ -93,6 +94,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   void **snd = (void **)(f->esp) + 2;
   void **trd = (void **)(f->esp) + 3;
 
+//  printf("IIIIIIIIIIIII: %d\n", syscall_num);
   switch (syscall_num) {
     case SYS_EXEC:
       if (!safe_access(fst)) f->eax = (uint32_t) EXIT_FAIL;
@@ -158,6 +160,10 @@ syscall_handler (struct intr_frame *f UNUSED)
       exit_if_unsafe(fst);
       exit_if_unsafe(snd);
       f->eax = (uint32_t)mmap(*(int *)fst, *snd);
+      break;
+    case SYS_MUNMAP:
+      exit_if_unsafe(fst);
+      munmap(*(int *)fst);
       break;
     default:break;
   }
@@ -315,6 +321,7 @@ filesize(int fd) {
 
 int
 read(int fd, void *buffer, unsigned size) {
+
   if (fd < STDOUT_FILENO || fd > FILE_LIMIT) {
     exit(EXIT_FAIL);
   }
@@ -327,9 +334,11 @@ read(int fd, void *buffer, unsigned size) {
   while (e != list_end(&cur->file_fd_list)){
     struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
     if (fileFd->fd == fd) {
+
         if (fileFd->tid != cur->tid) {
           exit(EXIT_FAIL);
         }
+
       if (fileFd->f != NULL) {
         return file_read(fileFd->f, buffer, size);
       } else {
@@ -338,6 +347,7 @@ read(int fd, void *buffer, unsigned size) {
     }
     e = e->next;
   }
+
   return 0;
 }
 
@@ -419,7 +429,7 @@ close(int fd) {
 }
 
 mapid_t mmap(int fd, void *addr) {
-//  printf("AAAAAAAAA\n");
+
   int file_size = filesize(fd);
   int md = currentMd;
   if (fd == 0 || fd == 1 || file_size == 0 || addr == 0 || (uint32_t) addr % PGSIZE != 0) {
@@ -436,7 +446,12 @@ mapid_t mmap(int fd, void *addr) {
     }
   }
 
+
+  void *kaddr = palloc_get_page(PAL_ZERO);
+
   struct thread *cur = thread_current();
+
+  uint32_t *pd = cur->pagedir;
   struct list_elem *e = list_begin(&cur->file_fd_list);
   while (e != list_end(&cur->file_fd_list)) {
     struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
@@ -445,18 +460,23 @@ mapid_t mmap(int fd, void *addr) {
         return -1;
       }
 
-      read(fileFd->fd, addr, (unsigned) file_size);
+      //didnt use addr
+      page_create(kaddr, fileFd->f, ALL_ZERO, true, 0);
+      read(fileFd->fd, kaddr, (unsigned) file_size);
+
 
       if (zero_set != 0) {
         //find the address of ending of the file
-        memset(addr + file_size, 0, (size_t) PGSIZE - zero_set);
+        memset(kaddr + file_size, 0, (size_t) PGSIZE - zero_set);
       }
+
+      pagedir_set_page(pd, addr, kaddr, false);
+
       fileFd->md = currentMd;
       fileFd->md_addr = addr;
       currentMd++;
-    } else {
-      e = e -> next;
     }
+      e = e -> next;
   }
   return md;
 }

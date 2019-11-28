@@ -153,13 +153,14 @@ page_fault (struct intr_frame *f)
   user = (f->error_code & PF_U) != 0;
 
   struct spt_entry *s_page = lookup_page(fault_addr);
+
   if (s_page == NULL) {
     safe_exit();
   }
 
   // to see if the page is writable;
   if (((uint32_t) fault_addr & (1 << 1)) == 0) {
-    safe_exit();
+   // safe_exit();
   }
 
   if (s_page->status == ALL_ZERO || s_page->status == IN_SWAP_SLOT || s_page->status == IN_FILESYS) {
@@ -171,7 +172,7 @@ page_fault (struct intr_frame *f)
   }
 
   if (thread_current()->in_syscall) {
-    exit(EXIT_FAIL);
+    //exit(EXIT_FAIL);
   } else if (!user) {
     kill(f);
   }
