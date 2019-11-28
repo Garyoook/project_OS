@@ -48,10 +48,12 @@ bool page_create(uint32_t *vaddr, struct file *file, enum page_status status, bo
   page->file = file;
   page->writtable = writable;
   page->offset = offset;
+
+  hash_insert(thread_current()->spt_hash_table, &page->hash_elem);
   return true;
 }
 
-struct spt_entry * lookup_page(const uint32_t *vaddr) {
+struct spt_entry * lookup_page(uint32_t *vaddr) {
   struct spt_entry *page= malloc(sizeof(struct spt_entry));
   page->upage = vaddr;
   struct hash_elem *e = hash_find(thread_current()->spt_hash_table, &page->hash_elem);

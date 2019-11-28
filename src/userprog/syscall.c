@@ -419,7 +419,7 @@ close(int fd) {
 }
 
 mapid_t mmap(int fd, void *addr) {
-  printf("AAAAAAAAA\n");
+//  printf("AAAAAAAAA\n");
   int file_size = filesize(fd);
   int md = currentMd;
   if (fd == 0 || fd == 1 || file_size == 0 || addr == 0 || (uint32_t) addr % PGSIZE != 0) {
