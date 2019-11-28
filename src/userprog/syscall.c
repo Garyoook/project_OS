@@ -446,7 +446,6 @@ mapid_t mmap(int fd, void *addr) {
     }
   }
 
-
   void *kaddr = palloc_get_page(PAL_ZERO);
 
   struct thread *cur = thread_current();
@@ -497,4 +496,9 @@ void munmap(mapid_t mapping)
       e = e -> next;
     }
   }
+}
+
+void grow_stack(void * vaddr) {
+  page_create(vaddr, NULL, ALL_ZERO, true, 0);
+
 }

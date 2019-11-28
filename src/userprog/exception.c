@@ -8,6 +8,9 @@
 #include "vm/frame.h"
 #include "vm/page.h"
 #include "threads/malloc.h"
+#include "threads/palloc.h"
+#include "threads/vaddr.h"
+#include "userprog/pagedir.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -152,26 +155,38 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
+  struct thread *cur = thread_current();
+
   struct spt_entry *s_page = lookup_page(fault_addr);
 
   if (s_page == NULL) {
     safe_exit();
   }
 
-  // to see if the page is writable;
-  if (((uint32_t) fault_addr & (1 << 1)) == 0) {
-   // safe_exit();
+  uint32_t *upage = pg_round_down(fault_addr);
+
+  if (!is_user_vaddr(fault_addr) || fault_addr == NULL || fault_addr >= PHYS_BASE
+      || fault_addr < (void *) 0x08048000 || fault_addr < (f->esp - 32)) {
+    safe_exit();
   }
+
+//  // to see if the page is writable;
+//  if (((uint32_t) usrPage & (1 << 1)) == 0) {
+//   // safe_exit();
+//  }
+
+  uint32_t *kpage = palloc_get_page(PAL_USER | PAL_ZERO);
+  pagedir_set_page(thread_current()->pagedir, upage, kpage,
+                                  true);
 
   if (s_page->status == ALL_ZERO || s_page->status == IN_SWAP_SLOT || s_page->status == IN_FILESYS) {
     struct frame_entry *frame = frame_create(fault_addr);
     frame->page = s_page->upage;
     frame->file = s_page->file;
     frame->offset = s_page->offset;
-
   }
 
-  if (thread_current()->in_syscall) {
+  if (cur->in_syscall) {
     //exit(EXIT_FAIL);
   } else if (!user) {
     kill(f);
@@ -190,6 +205,6 @@ page_fault (struct intr_frame *f)
 
 void safe_exit() {
   free(thread_current()->spt_hash_table);
-  exit(-1);
+  exit(EXIT_FAIL);
 }
 

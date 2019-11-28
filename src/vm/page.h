@@ -22,6 +22,8 @@ struct spt_entry {
   uint32_t *upage;
   enum page_status status;
   struct file *file;
+  size_t page_read_bytes;
+  size_t page_zero_bytes;
   off_t offset;
   bool writtable;
   struct hash_elem hash_elem;
