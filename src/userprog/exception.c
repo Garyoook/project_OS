@@ -8,6 +8,7 @@
 #include "vm/frame.h"
 #include "vm/page.h"
 #include "threads/malloc.h"
+#include "pagedir.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -153,6 +154,7 @@ page_fault (struct intr_frame *f)
   user = (f->error_code & PF_U) != 0;
 
   struct spt_entry *s_page = lookup_page(fault_addr);
+
 
   if (s_page == NULL) {
     safe_exit();
