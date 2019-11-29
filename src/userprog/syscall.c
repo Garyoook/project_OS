@@ -477,7 +477,6 @@ mapid_t mmap(int fd, void *addr) {
       if (fileFd->f == NULL || fileFd->tid != cur->tid) {
         return -1;
       }
-      printf("AAAAAAAAA:%d\n", (int)addr);
 
 //      int page_no = ((uint32_t)file_size) / PGSIZE;
 //      uint32_t zero_set = ((uint32_t)file_size)  % PGSIZE;
@@ -503,12 +502,10 @@ mapid_t mmap(int fd, void *addr) {
 //      }
 
       fileFd->md = currentMd;
-      fileFd->md_addr = addr;
       fileFd->mmaped = true;
       currentMd++;
       fileFd->file_size = file_size;
       fileFd->file_pos = file_tell(fileFd->f);
-   //   printf("AAAAAAAAA:%d\n", (int)kaddr);
       return fileFd->md;
     }
       e = e -> next;
@@ -534,8 +531,8 @@ void munmap(mapid_t mapping)
         file_allow_write(fileFd->f);
 
 
-  //    printf("lk:%d\n", (int)fileFd->file_size);
- //     printf("WWWWWWW:%d\n", (int)pagedir_get_page(cur->pagedir, fileFd->md_addr));
+      printf("lk:%d\n", (int)fileFd->file_size);
+      printf("WWWWWWW:%d\n", (int)pagedir_get_page(cur->pagedir, fileFd->md_addr));
 
       off_t r = file_write_at(fileFd->f, pagedir_get_page(cur->pagedir, fileFd->md_addr), fileFd->file_size, 0);
       pagedir_clear_page(cur->pagedir, fileFd->md_addr);

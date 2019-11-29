@@ -183,21 +183,26 @@ page_fault (struct intr_frame *f)
 //  }
 
   uint32_t *upage = pg_round_down(fault_addr);
-  uint32_t *kpage = palloc_get_page(PAL_USER | PAL_ZERO);
 
   struct spt_entry *sf = page_lookup(upage);
   if (sf == NULL) {
-    printf("QQQ\n");
     safe_exit();
+  }
+
+  struct frame_entry *frame = frame_lookup(upage);
+  if(frame == NULL) {
+    frame = frame_create(upage);
   }
 
   if (sf->status == IN_FILESYS) {
     struct file *this_file = sf->file;
+    frame->file = this_file;
     int file_size = file_length(this_file);
     int page_no = ((uint32_t)file_size) / PGSIZE;
+    uint32_t *kpage = palloc_get_page(PAL_USER | PAL_ZERO);
 
     for (int a = 0; a < page_no; a++) {
-      if (pagedir_get_page(thread_current()->pagedir, fault_addr + (uint32_t )(page_no * PGSIZE)) != NULL){
+      if (page_lookup(upage + (uint32_t )(page_no * PGSIZE)) != NULL){
         //lookup_page((uint32_t *) addr + a) != NULL) {
         //?
         safe_exit();
@@ -207,12 +212,9 @@ page_fault (struct intr_frame *f)
     uint32_t zero_set = ((uint32_t)file_size)  % PGSIZE;
     off_t file_read_byte;
 
-    //debug!!!!!!!!!!!!!!!
-    printf("AA:%d\n", (int)file_size);
-    safe_exit();
-    //debug!!!!!!!!!!!!!!!!!!
 
-    file_read_byte = file_read(this_file, upage, file_size);
+    file_reopen(this_file);
+    file_read_byte = file_read(this_file, kpage, file_size);
 
     if (file_read_byte != file_size) {
       safe_exit();
@@ -220,8 +222,11 @@ page_fault (struct intr_frame *f)
 
     if (zero_set != 0) {
       //find the address of ending of the file
-      memset(fault_addr + file_size, 0, (size_t) PGSIZE - zero_set);
+      memset(kpage + file_size, 0, (size_t) PGSIZE - zero_set);
     }
+
+    install_page(upage, kpage, false);
+    return;
   }
 
 

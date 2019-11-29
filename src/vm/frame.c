@@ -35,6 +35,18 @@ struct frame_entry * frame_create(uint32_t *page)
   return f;
 }
 
+struct frame_entry *frame_lookup(void *addr) {
+  struct list_elem *e = list_begin(&frame_table);
+  while (e != list_end(&frame_table)) {
+    struct frame_entry *frame = list_entry(e, struct frame_entry, elem);
+    if (frame->page == addr) {
+      return frame;
+    }
+    e = e->next;
+  }
+  return NULL;
+}
+
 int frame_table_size()
 {
   return (int)list_size(&frame_table);
