@@ -1,6 +1,8 @@
 #include "userprog/exception.h"
 #include <inttypes.h>
 #include <stdio.h>
+#include "filesys/file.h"
+#include <string.h>
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
@@ -11,6 +13,7 @@
 #include "threads/palloc.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
+#include "process.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -156,17 +159,21 @@ page_fault (struct intr_frame *f)
   user = (f->error_code & PF_U) != 0;
 
   struct thread *cur = thread_current();
+//  printf("WWWWww:%d\n", (int)fault_addr);
+//
+//  struct spt_entry *s_page = lookup_page(fault_addr);
 
-  struct spt_entry *s_page = lookup_page(fault_addr);
 
-  if (s_page == NULL) {
-    safe_exit();
-  }
 
-  uint32_t *upage = pg_round_down(fault_addr);
+//  return;
+//  if (s_page == NULL) {
+//    safe_exit();
+//  }
+
+
 
   if (!is_user_vaddr(fault_addr) || fault_addr == NULL || fault_addr >= PHYS_BASE
-      || fault_addr < (void *) 0x08048000 || fault_addr < (f->esp - 32)) {
+      || fault_addr < (void *) 0x08048000 || fault_addr > (f->esp - 32)) {
     safe_exit();
   }
 
@@ -175,19 +182,59 @@ page_fault (struct intr_frame *f)
 //   // safe_exit();
 //  }
 
+  uint32_t *upage = pg_round_down(fault_addr);
   uint32_t *kpage = palloc_get_page(PAL_USER | PAL_ZERO);
-  pagedir_set_page(thread_current()->pagedir, upage, kpage,
-                                  true);
 
-  if (s_page->status == ALL_ZERO || s_page->status == IN_SWAP_SLOT || s_page->status == IN_FILESYS) {
-    struct frame_entry *frame = frame_create(fault_addr);
-    frame->page = s_page->upage;
-    frame->file = s_page->file;
-    frame->offset = s_page->offset;
+  struct spt_entry *sf = page_lookup(upage);
+  if (sf == NULL) {
+    printf("QQQ\n");
+    safe_exit();
   }
 
+  if (sf->status == IN_FILESYS) {
+    struct file *this_file = sf->file;
+    int file_size = file_length(this_file);
+    int page_no = ((uint32_t)file_size) / PGSIZE;
+
+    for (int a = 0; a < page_no; a++) {
+      if (pagedir_get_page(thread_current()->pagedir, fault_addr + (uint32_t )(page_no * PGSIZE)) != NULL){
+        //lookup_page((uint32_t *) addr + a) != NULL) {
+        //?
+        safe_exit();
+      }
+    }
+
+    uint32_t zero_set = ((uint32_t)file_size)  % PGSIZE;
+    off_t file_read_byte;
+
+    //debug!!!!!!!!!!!!!!!
+    printf("AA:%d\n", (int)file_size);
+    safe_exit();
+    //debug!!!!!!!!!!!!!!!!!!
+
+    file_read_byte = file_read(this_file, upage, file_size);
+
+    if (file_read_byte != file_size) {
+      safe_exit();
+    }
+
+    if (zero_set != 0) {
+      //find the address of ending of the file
+      memset(fault_addr + file_size, 0, (size_t) PGSIZE - zero_set);
+    }
+  }
+
+
+
+//  if (s_page->status == ALL_ZERO || s_page->status == IN_SWAP_SLOT || s_page->status == IN_FILESYS) {
+//    struct frame_entry *frame = frame_create(fault_addr);
+//    frame->page = s_page->upage;
+//    frame->file = s_page->file;
+//    frame->offset = s_page->offset;
+//  }
+
   if (cur->in_syscall) {
-    //exit(EXIT_FAIL);
+    exit(EXIT_FAIL);
   } else if (!user) {
     kill(f);
   }

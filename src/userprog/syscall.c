@@ -99,7 +99,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   void **snd = (void **)(f->esp) + 2;
   void **trd = (void **)(f->esp) + 3;
 
-//  printf("IIIIIIIIIIIII: %d\n", syscall_num);
+  //printf("IIIIIIIIIIIII: %d\n", syscall_num);
   switch (syscall_num) {
     case SYS_EXEC:
       if (!safe_access(fst)) f->eax = (uint32_t) EXIT_FAIL;
@@ -460,22 +460,14 @@ mapid_t mmap(int fd, void *addr) {
     return -1;
   }
 
-  int page_no = ((uint32_t)file_size) / PGSIZE;
-  uint32_t zero_set = ((uint32_t)file_size)  % PGSIZE;
-  off_t file_read_byte;
+
 
   // to check no overlapping
-  for (int a = 0; a < page_no; a++) {
-    if (pagedir_get_page(thread_current()->pagedir, addr + (uint32_t )(page_no * PGSIZE)) != NULL){
-        //lookup_page((uint32_t *) addr + a) != NULL) {
-      //?
-      return -1;
-    }
-  }
 
-  void *kaddr = palloc_get_page(PAL_USER);
-  if (kaddr == NULL)
-    return -1;
+
+//  void *kaddr = palloc_get_page(PAL_USER);
+//  if (kaddr == NULL)
+//    return -1;
 
   struct thread *cur = thread_current();
   struct list_elem *e = list_begin(&cur->file_fd_list);
@@ -485,26 +477,30 @@ mapid_t mmap(int fd, void *addr) {
       if (fileFd->f == NULL || fileFd->tid != cur->tid) {
         return -1;
       }
+      printf("AAAAAAAAA:%d\n", (int)addr);
 
-      page_create(kaddr, fileFd->f, ALL_ZERO, false, 0);
-      file_read_byte = file_read(fileFd->f, kaddr, file_size);
-
-      if (file_read_byte != file_size) {
-        palloc_free_page(kaddr);
-        return -1;
-      }
-
-      if (zero_set != 0) {
-        //find the address of ending of the file
-        memset(kaddr + file_size, 0, (size_t) PGSIZE - zero_set);
-      }
-
-      if ( !(pagedir_get_page (cur->pagedir, addr) == NULL
-            && pagedir_set_page (cur->pagedir, addr, kaddr, false))) {
-        palloc_free_page(kaddr);
-        return -1;
-      }
-      addr += PGSIZE;
+//      int page_no = ((uint32_t)file_size) / PGSIZE;
+//      uint32_t zero_set = ((uint32_t)file_size)  % PGSIZE;
+//      off_t file_read_byte;
+//
+      page_create(addr, fileFd->f, IN_FILESYS, false, 0);
+//      file_read_byte = file_read(fileFd->f, kaddr, file_size);
+//
+//      if (file_read_byte != file_size) {
+//        palloc_free_page(kaddr);
+//        return -1;
+//      }
+//
+//      if (zero_set != 0) {
+//        //find the address of ending of the file
+//        memset(kaddr + file_size, 0, (size_t) PGSIZE - zero_set);
+//      }
+//
+//      if ( !(pagedir_get_page (cur->pagedir, addr) == NULL
+//            && pagedir_set_page (cur->pagedir, addr, kaddr, false))) {
+//        palloc_free_page(kaddr);
+//        return -1;
+//      }
 
       fileFd->md = currentMd;
       fileFd->md_addr = addr;
@@ -512,6 +508,7 @@ mapid_t mmap(int fd, void *addr) {
       currentMd++;
       fileFd->file_size = file_size;
       fileFd->file_pos = file_tell(fileFd->f);
+   //   printf("AAAAAAAAA:%d\n", (int)kaddr);
       return fileFd->md;
     }
       e = e -> next;
@@ -529,11 +526,16 @@ void munmap(mapid_t mapping)
       if (fileFd->f == NULL || fileFd->tid != cur->tid) {
         return;
       }
+
       if (fileFd->md_addr == NULL)
         return;
 
       if (!fileFd->reopened)
         file_allow_write(fileFd->f);
+
+
+  //    printf("lk:%d\n", (int)fileFd->file_size);
+ //     printf("WWWWWWW:%d\n", (int)pagedir_get_page(cur->pagedir, fileFd->md_addr));
 
       off_t r = file_write_at(fileFd->f, pagedir_get_page(cur->pagedir, fileFd->md_addr), fileFd->file_size, 0);
       pagedir_clear_page(cur->pagedir, fileFd->md_addr);
@@ -541,9 +543,4 @@ void munmap(mapid_t mapping)
     }
     e = e->next;
   }
-}
-
-void grow_stack(void * vaddr) {
-  page_create(vaddr, NULL, ALL_ZERO, true, 0);
-
 }
