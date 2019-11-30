@@ -1,10 +1,36 @@
 #include "userprog/exception.h"
 #include <inttypes.h>
 #include <stdio.h>
+#include "filesys/file.h"
+#include <string.h>
+#include "threads/vaddr.h"
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "syscall.h"
+#include "vm/page.h"
+#include "userprog/process.h"
+#include <debug.h>
+#include <inttypes.h>
+#include <round.h>
+#include <stdio.h>
+#include <string.h>
+#include <kernel/hash.h>
+#include <vm/page.h>
+#include "userprog/gdt.h"
+#include "userprog/pagedir.h"
+#include "userprog/tss.h"
+
+#include "filesys/file.h"
+#include "filesys/filesys.h"
+#include "threads/flags.h"
+#include "threads/interrupt.h"
+#include "threads/palloc.h"
+#include "threads/malloc.h"
+#include "threads/thread.h"
+#include "threads/vaddr.h"
+#include "syscall.h"
+#include "vm/frame.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -120,6 +146,17 @@ kill (struct intr_frame *f)
    can find more information about both of these in the
    description of "Interrupt 14--Page Fault Exception (#PF)" in
    [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
+bool
+install_page (void *upage, void *kpage, bool writable)
+{
+  struct thread *t = thread_current ();
+
+  /* Verify that there's not already a page at that virtual
+     address, then map our page there. */
+  return (pagedir_get_page (t->pagedir, upage) == NULL
+          && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+
 static void
 page_fault (struct intr_frame *f) 
 {
@@ -146,6 +183,53 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
+
+  struct spage* spage1 =  lookup_spage(fault_addr);
+
+  uint32_t read_bytes = spage1->read_bytes;
+  uint32_t zero_bytes = spage1->zero_bytes;
+  uint8_t *upage = spage1->upage;
+  off_t ofs = spage1->offset;
+  bool writable = spage1->writable;
+
+  file_seek (spage1->file1, ofs);
+  while (read_bytes > 0 || zero_bytes > 0)
+  {
+    /* Calculate how to fill this page.
+       We will read PAGE_READ_BYTES bytes from FILE
+       and zero the final PAGE_ZERO_BYTES bytes. */
+    size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+    size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+    uint8_t *kpage = frame_create(PAL_USER, thread_current());
+
+    if (kpage == NULL)
+      exit(-1);
+
+      /* Load this page. */
+      if (file_read (spage1->file1, kpage, page_read_bytes) != (int) page_read_bytes)
+        {
+          palloc_free_page (kpage);
+          exit(-1);
+        }
+      memset (kpage + page_read_bytes, 0, page_zero_bytes);
+
+      /* Add the page to the process's address space. */
+      if (!install_page (upage, kpage, writable))
+        {
+          palloc_free_page (kpage);
+          exit(-1);
+        }
+
+    /* Advance. */
+    read_bytes -= page_read_bytes;
+    zero_bytes -= page_zero_bytes;
+    upage += PGSIZE;
+  }
+  return;
+
+
+
 
   if (thread_current()->in_syscall) {
     exit(EXIT_FAIL);
