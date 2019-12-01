@@ -29,6 +29,7 @@ struct spage{
   uint32_t zero_bytes;
   bool writable;
   struct hash_elem pelem;
+  bool for_lazy_load;
 };
 
 unsigned

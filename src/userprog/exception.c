@@ -37,6 +37,7 @@ static long long page_fault_cnt;
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
+int num = 2;
 
 /* Registers handlers for interrupts that can be caused by user
    programs.
@@ -186,50 +187,70 @@ page_fault (struct intr_frame *f)
 
   struct spage* spage1 =  lookup_spage(fault_addr);
 
-  uint32_t read_bytes = spage1->read_bytes;
-  uint32_t zero_bytes = spage1->zero_bytes;
-  uint8_t *upage = spage1->upage;
-  off_t ofs = spage1->offset;
-  bool writable = spage1->writable;
-
-  file_seek (spage1->file1, ofs);
-  while (read_bytes > 0 || zero_bytes > 0)
-  {
-    /* Calculate how to fill this page.
-       We will read PAGE_READ_BYTES bytes from FILE
-       and zero the final PAGE_ZERO_BYTES bytes. */
-    size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
-    size_t page_zero_bytes = PGSIZE - page_read_bytes;
-
-    uint8_t *kpage = frame_create(PAL_USER, thread_current());
-
-    if (kpage == NULL)
-      exit(-1);
-
-      /* Load this page. */
-      if (file_read (spage1->file1, kpage, page_read_bytes) != (int) page_read_bytes)
-        {
-          palloc_free_page (kpage);
-          exit(-1);
-        }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
-
-      /* Add the page to the process's address space. */
-      if (!install_page (upage, kpage, writable))
-        {
-          palloc_free_page (kpage);
-          exit(-1);
-        }
-
-    /* Advance. */
-    read_bytes -= page_read_bytes;
-    zero_bytes -= page_zero_bytes;
-    upage += PGSIZE;
+  if (spage1 == NULL) {
+    if (fault_addr >= f->esp - 32) {
+    uint8_t *kpage;
+    bool success = false;
+    kpage = frame_create(PAL_USER, thread_current());
+    if (kpage != NULL)
+    {
+      success = install_page (((uint8_t *) PHYS_BASE) - num * PGSIZE, kpage, true);
+      if (success){
+//        f->esp = PHYS_BASE - 2 * PGSIZE;
+        num++;
+        thread_current()->stack = PHYS_BASE - PGSIZE;
+      }
+      else {
+        palloc_free_page(kpage);
+        exit(-1);
+      }
+    }
+    return;} else {
+    exit(-1);
   }
-  return;
+  } else {
 
+    uint32_t read_bytes = spage1->read_bytes;
+    uint32_t zero_bytes = spage1->zero_bytes;
+    uint8_t *upage = spage1->upage;
+    off_t ofs = spage1->offset;
+    bool writable = spage1->writable;
+    if (not_present) {
+      file_seek(spage1->file1, ofs);
+      while (read_bytes > 0 || zero_bytes > 0) {
+        /* Calculate how to fill this page.
+           We will read PAGE_READ_BYTES bytes from FILE
+           and zero the final PAGE_ZERO_BYTES bytes. */
+        size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+        size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
+        uint8_t *kpage = frame_create(PAL_USER, thread_current());
 
+        if (kpage == NULL)
+          exit(-1);
+
+        /* Load this page. */
+        if (file_read(spage1->file1, kpage, page_read_bytes) != (int) page_read_bytes) {
+          palloc_free_page(kpage);
+          exit(-1);
+        }
+        memset(kpage + page_read_bytes, 0, page_zero_bytes);
+
+        /* Add the page to the process's address space. */
+        if (!install_page(upage, kpage, writable)) {
+          palloc_free_page(kpage);
+          exit(-1);
+        }
+
+        /* Advance. */
+        read_bytes -= page_read_bytes;
+        zero_bytes -= page_zero_bytes;
+        upage += PGSIZE;
+      }
+      return;
+    }
+
+  }
 
   if (thread_current()->in_syscall) {
     exit(EXIT_FAIL);
