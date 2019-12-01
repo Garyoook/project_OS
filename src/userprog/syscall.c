@@ -495,7 +495,7 @@ mapid_t mmap(int fd, void *addr) {
 
       for (uint32_t a = 0; a < file_size; a += PGSIZE) {
        // printf("P:%d\n", a);
-        page_create(addr + a, fileFd->f, IN_FILESYS, false, 0);
+        page_create(addr + a, fileFd->f, IN_FILESYS, false, 0, 0);
         frame_create(addr + a, file_tell(fileFd->f), fileFd->f);
       }
 //      file_read_byte = file_read(fileFd->f, kaddr, file_size);

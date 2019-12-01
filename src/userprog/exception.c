@@ -20,6 +20,7 @@ static long long page_fault_cnt;
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
+int page_shift = 2;
 
 void safe_exit();
 
@@ -120,6 +121,17 @@ kill (struct intr_frame *f)
     }
 }
 
+bool
+install_page (void *upage, void *kpage, bool writable)
+{
+  struct thread *t = thread_current ();
+
+  /* Verify that there's not already a page at that virtual
+     address, then map our page there. */
+  return (pagedir_get_page (t->pagedir, upage) == NULL
+          && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+
 /* Page fault handler.  This is a skeleton that must be filled in
    to implement virtual memory.  Some solutions to task 2 may
    also require modifying this code.
@@ -158,29 +170,89 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
+  /***
+   * wt Part start: for stack growth
+   */
+  struct spt_entry* spage1 = page_lookup(fault_addr);
+
+  if (spage1 == NULL) {
+    if (fault_addr >= f->esp - 32) {
+      uint8_t *kpage;
+      bool success = false;
+      kpage = frame_create(PAL_USER, thread_current(), NULL);
+      if (kpage != NULL)
+      {
+        success = install_page (((uint8_t *) PHYS_BASE) - page_shift * PGSIZE, kpage, true);
+        if (success){
+//        f->esp = PHYS_BASE - 2 * PGSIZE;
+          page_shift++;
+          thread_current()->stack = PHYS_BASE - PGSIZE;
+        }
+        else {
+          palloc_free_page(kpage);
+          exit(-1);
+        }
+      }
+      return;} else {
+      exit(-1);
+    }
+  } else {
+
+    uint32_t read_bytes = spage1->page_read_bytes;
+    uint32_t zero_bytes = spage1->page_zero_bytes;
+    uint8_t *upage = spage1->upage;
+    off_t ofs = spage1->offset;
+    bool writable = spage1->writable;
+    if (not_present) {
+      file_seek(spage1->file, ofs);
+      while (read_bytes > 0 || zero_bytes > 0) {
+        /* Calculate how to fill this page.
+           We will read PAGE_READ_BYTES bytes from FILE
+           and zero the final PAGE_ZERO_BYTES bytes. */
+        size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+        size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+        uint8_t *kpage = frame_create(PAL_USER, thread_current(), NULL);
+
+        if (kpage == NULL)
+          exit(-1);
+
+        /* Load this page. */
+        if (file_read(spage1->file, kpage, page_read_bytes) != (int) page_read_bytes) {
+          palloc_free_page(kpage);
+          exit(-1);
+        }
+        memset(kpage + page_read_bytes, 0, page_zero_bytes);
+
+        /* Add the page to the process's address space. */
+        if (!install_page(upage, kpage, writable)) {
+          palloc_free_page(kpage);
+          exit(-1);
+        }
+
+        /* Advance. */
+        read_bytes -= page_read_bytes;
+        zero_bytes -= page_zero_bytes;
+        upage += PGSIZE;
+      }
+      return;
+    }
+
+  }
+  /***
+   * wt Part end
+   */
+
+
+  /***
+   * ni Part start: for mmap
+   */
   struct thread *cur = thread_current();
-//  printf("WWWWww:%d\n", (int)fault_addr);
-//
-//  struct spt_entry *s_page = lookup_page(fault_addr);
-
-
-
-//  return;
-//  if (s_page == NULL) {
-//    safe_exit();
-//  }
-
-
 
   if (!is_user_vaddr(fault_addr) || fault_addr == NULL || fault_addr >= PHYS_BASE
       || fault_addr < (void *) 0x08048000 || fault_addr > (f->esp - 32)) {
     safe_exit();
   }
-
-//  // to see if the page is writable;
-//  if (((uint32_t) usrPage & (1 << 1)) == 0) {
-//   // safe_exit();
-//  }
 
   uint8_t *upage = pg_round_down(fault_addr);
 
@@ -199,20 +271,12 @@ page_fault (struct intr_frame *f)
 
     file_reopen(this_file);
     load_segment(this_file, frame->offset, upage, (uint32_t)file_size, PGSIZE - zero_set, true);
-//    uint32_t *kpage = ;
-//    printf("!!%d\n", pagedir_get_page(cur->pagedir, upage);
 
     return;
   }
-
-
-
-//  if (s_page->status == ALL_ZERO || s_page->status == IN_SWAP_SLOT || s_page->status == IN_FILESYS) {
-//    struct frame_entry *frame = frame_create(fault_addr);
-//    frame->page = s_page->upage;
-//    frame->file = s_page->file;
-//    frame->offset = s_page->offset;
-//  }
+  /***
+   * ni Part end
+   */
 
   if (cur->in_syscall) {
     exit(EXIT_FAIL);

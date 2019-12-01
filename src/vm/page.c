@@ -36,7 +36,7 @@ void sub_page_table_init() {
 }
 
 
-bool page_create(uint32_t *vaddr, struct file *file, enum page_status status, bool writable, off_t offset) {
+bool page_create(uint32_t *vaddr, struct file *file, enum page_status status, bool writable, off_t offset, bool b) {
   struct spt_entry *page = (struct spt_entry *) malloc(sizeof(struct spt_entry));
   if (page == NULL) {
     return false;
@@ -44,7 +44,7 @@ bool page_create(uint32_t *vaddr, struct file *file, enum page_status status, bo
   page->upage = vaddr;
   page->status = status;
   page->file = file;
-  page->writtable = writable;
+  page->writable = writable;
   page->offset = offset;
   hash_insert(thread_current()->spt_hash_table, &page->hash_elem);
   return true;

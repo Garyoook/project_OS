@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "fixed-point.h"
 #include "synch.h"
+#include "kernel/hash.h"
 
 /* List of all threads that are blocked. */
 struct list blocked_list;
