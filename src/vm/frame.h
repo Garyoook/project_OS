@@ -21,8 +21,8 @@ struct frame_entry
 };
 
 void frame_table_init(void);
-struct frame_entry * frame_create(uint32_t *page);
+struct frame_entry * frame_create(uint32_t *page, off_t offset, struct file *file);
 struct frame_entry *frame_lookup(void *addr);
-
+void frame_destroy(const uint32_t *addr);
 
 #endif //PINTOS_47_FRAME_H

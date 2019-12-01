@@ -182,50 +182,49 @@ page_fault (struct intr_frame *f)
 //   // safe_exit();
 //  }
 
-  uint32_t *upage = pg_round_down(fault_addr);
-
-  struct spt_entry *sf = page_lookup(upage);
+  uint8_t *upage = pg_round_down(fault_addr);
+ // printf("QWWw\n");
+  struct spt_entry *sf = page_lookup((uint32_t *)upage);
   if (sf == NULL) {
+ //   printf("WWWWWWw\n");
     safe_exit();
   }
 
   struct frame_entry *frame = frame_lookup(upage);
-  if(frame == NULL) {
-    frame = frame_create(upage);
-  }
 
   if (sf->status == IN_FILESYS) {
-    struct file *this_file = sf->file;
-    frame->file = this_file;
+    struct file *this_file = frame->file;
     int file_size = file_length(this_file);
-    int page_no = ((uint32_t)file_size) / PGSIZE;
-    uint32_t *kpage = palloc_get_page(PAL_USER | PAL_ZERO);
-
-    for (int a = 0; a < page_no; a++) {
-      if (page_lookup(upage + (uint32_t )(page_no * PGSIZE)) != NULL){
-        //lookup_page((uint32_t *) addr + a) != NULL) {
-        //?
-        safe_exit();
-      }
-    }
-
-    uint32_t zero_set = ((uint32_t)file_size)  % PGSIZE;
-    off_t file_read_byte;
-
-
-    file_reopen(this_file);
-    file_read_byte = file_read(this_file, kpage, file_size);
-
-    if (file_read_byte != file_size) {
-      safe_exit();
-    }
-
-    if (zero_set != 0) {
-      //find the address of ending of the file
-      memset(kpage + file_size, 0, (size_t) PGSIZE - zero_set);
-    }
-
-    install_page(upage, kpage, false);
+//    int page_no = ((uint32_t)file_size) / PGSIZE;
+//    uint32_t *kpage = palloc_get_page(PAL_USER | PAL_ZERO);
+//
+//    for (int a = 0; a < page_no; a++) {
+//      if (page_lookup(upage + (uint32_t )(page_no * PGSIZE)) != NULL){
+//        //lookup_page((uint32_t *) addr + a) != NULL) {
+//        //?
+//        safe_exit();
+//      }
+//    }
+    uint32_t zero_set = ((uint32_t)file_size) % PGSIZE;
+//    off_t file_read_byte;
+//
+//
+    //file_reopen(this_file);
+//    file_read_byte = file_read(this_file, kpage, file_size);
+//
+//    if (file_read_byte != file_size) {
+//      safe_exit();
+//    }
+//
+//    if (zero_set != 0) {
+//      //find the address of ending of the file
+//      memset(kpage + file_size, 0, (size_t) PGSIZE - zero_set);
+//    }
+//
+//    install_page(upage, kpage, false);
+//    return;
+   // printf("AAA\n");
+    load_segment(this_file, frame->offset, upage, (uint32_t)file_size, PGSIZE - zero_set, false);
     return;
   }
 

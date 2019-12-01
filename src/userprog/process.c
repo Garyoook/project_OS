@@ -387,7 +387,7 @@ struct Elf32_Phdr
 
 static bool setup_stack(void **esp);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
-static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
+bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
                           bool writable);
 
@@ -502,8 +502,6 @@ load (const char *cmdline, void (**eip) (void), void **esp)
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
-
-  frame_create(t->pagedir);
   page_create(t->pagedir, file, ALL_ZERO, true, file_ofs);
 
   success = true;
@@ -579,7 +577,7 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
 
    Return true if successful, false if a memory allocation error
    or disk read error occurs. */
-static bool
+bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
               uint32_t read_bytes, uint32_t zero_bytes, bool writable)
 {

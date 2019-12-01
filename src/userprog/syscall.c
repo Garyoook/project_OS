@@ -478,11 +478,31 @@ mapid_t mmap(int fd, void *addr) {
         return -1;
       }
 
-//      int page_no = ((uint32_t)file_size) / PGSIZE;
+      int page_no = ((uint32_t)file_size) / PGSIZE;
 //      uint32_t zero_set = ((uint32_t)file_size)  % PGSIZE;
-//      off_t file_read_byte;
+//
+//  off_t file_read_byte;
+
+//      printf("AAA:%d\n", file_size);
+//      printf("s:%d\n", PGSIZE);
+//      printf("z:%d\n", page_no);
+
+      for (uint32_t a = 0; a < file_size; a += PGSIZE) {
+      //  printf("P:%d\n", a);
+        if (frame_lookup(addr + a) != NULL) {
+
+
+          //lookup_page((uint32_t *) addr + a) != NULL) {
+          //?
+          return -1;
+        }
+      }
 //
       page_create(addr, fileFd->f, IN_FILESYS, false, 0);
+
+      for (uint32_t a = 0; a < file_size; a += PGSIZE) {
+        frame_create(addr + a, file_tell(fileFd->f), fileFd->f);
+      }
 //      file_read_byte = file_read(fileFd->f, kaddr, file_size);
 //
 //      if (file_read_byte != file_size) {
@@ -503,6 +523,7 @@ mapid_t mmap(int fd, void *addr) {
 
       fileFd->md = currentMd;
       fileFd->mmaped = true;
+      fileFd->md_addr = addr;
       currentMd++;
       fileFd->file_size = file_size;
       fileFd->file_pos = file_tell(fileFd->f);
@@ -529,14 +550,21 @@ void munmap(mapid_t mapping)
 
       if (!fileFd->reopened)
         file_allow_write(fileFd->f);
+      //printf("OIIIIIII\n");
+      struct frame_entry *frame = frame_lookup(fileFd->md_addr);
+      struct spt_entry *page = page_lookup(fileFd->md_addr);
+
+      int file_size = file_length(frame->file);
 
 
-      printf("lk:%d\n", (int)fileFd->file_size);
-      printf("WWWWWWW:%d\n", (int)pagedir_get_page(cur->pagedir, fileFd->md_addr));
+      off_t r = file_write_at(frame->file, pagedir_get_page(cur->pagedir, fileFd->md_addr), file_length(frame->file), 0);
 
-      off_t r = file_write_at(fileFd->f, pagedir_get_page(cur->pagedir, fileFd->md_addr), fileFd->file_size, 0);
-      pagedir_clear_page(cur->pagedir, fileFd->md_addr);
-      page_destroy(fileFd->md_addr);
+      for (uint32_t a = 0; a < file_size; a += PGSIZE) {
+        pagedir_clear_page(cur->pagedir, fileFd->md_addr + a);
+
+        page_destroy(fileFd->md_addr + a);
+        frame_destroy(fileFd->md_addr + a);
+      }
     }
     e = e->next;
   }

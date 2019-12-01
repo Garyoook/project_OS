@@ -3,6 +3,7 @@
 //
 
 #include <stdbool.h>
+#include <stdio.h>
 #include "threads/thread.h"
 #include "threads/palloc.h"
 #include "page.h"
