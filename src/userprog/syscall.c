@@ -44,6 +44,7 @@ void
 syscall_init (void)
 {
   lock_init(&syscall_lock);
+  num = 2;
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -434,6 +435,10 @@ bool overlaps(void* addr){
 }
 
 mapid_t mmap(int fd, void *addr) {
+
+  if (addr > (PHYS_BASE) - num * PGSIZE) {
+    return -1;
+  }
 
   if (overlaps(addr)) return -1;
 
