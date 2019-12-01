@@ -502,10 +502,6 @@ load (const char *cmdline, void (**eip) (void), void **esp)
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
-
-  frame_create(t->pagedir);
-  page_create(t->pagedir, file, ALL_ZERO, true, file_ofs);
-
   success = true;
 
   // deny write as the file is ready to run at the moment.

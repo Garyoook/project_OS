@@ -206,6 +206,10 @@ page_fault (struct intr_frame *f)
         //lookup_page((uint32_t *) addr + a) != NULL) {
         //?
         safe_exit();
+      } else {
+
+        /*eviction here */
+
       }
     }
 

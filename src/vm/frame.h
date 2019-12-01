@@ -21,7 +21,7 @@ struct frame_entry
 };
 
 void frame_table_init(void);
-struct frame_entry * frame_create(uint32_t *page);
+struct frame_entry * frame_create(uint32_t *addr);
 struct frame_entry *frame_lookup(void *addr);
 
 

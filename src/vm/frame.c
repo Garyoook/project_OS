@@ -17,19 +17,27 @@ void frame_table_init(void)
   list_init(&frame_table);
 }
 
-struct frame_entry * frame_create(uint32_t *page)
+struct frame_entry * frame_create(uint32_t *addr)
 {
   struct frame_entry *f;
 
-  f = palloc_get_page(PAL_USER);
+  f = palloc_get_page(PAL_USER | PAL_ZERO);
   if (f == NULL) {
     frame_evict();
     return NULL;
   }
 
+  struct spt_entry *page = page_lookup(addr);
+  if (page == NULL) {
+    return  NULL;
+  }
+
+
   memset(f, 0, sizeof *f);
-  f->page = page;
+  f->page = addr;
   f->td = thread_current();
+//  f->offset = page->offset;
+  f->spt = page;
 
   list_push_back(&frame_table, &f->elem);
   return f;

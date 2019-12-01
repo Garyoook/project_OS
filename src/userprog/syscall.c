@@ -531,9 +531,6 @@ void munmap(mapid_t mapping)
         file_allow_write(fileFd->f);
 
 
-      printf("lk:%d\n", (int)fileFd->file_size);
-      printf("WWWWWWW:%d\n", (int)pagedir_get_page(cur->pagedir, fileFd->md_addr));
-
       off_t r = file_write_at(fileFd->f, pagedir_get_page(cur->pagedir, fileFd->md_addr), fileFd->file_size, 0);
       pagedir_clear_page(cur->pagedir, fileFd->md_addr);
       page_destroy(fileFd->md_addr);
