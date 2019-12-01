@@ -10,6 +10,7 @@
 
 
 struct frame{
+  void* frame;
   void* page;
   struct thread* t;
   struct list_elem f_elem;

@@ -19,3 +19,8 @@ void frame_delete(struct frame* frame1){
   list_remove(&frame1->f_elem);
   free(frame1);
 }
+
+void frame_update() {
+}
+
+
