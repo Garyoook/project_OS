@@ -484,6 +484,14 @@ void munmap(mapid_t mapping) {
 
         if (!fileFd->reopened)
           file_allow_write(fileFd->f);
+        struct spage *page = lookup_spage(fileFd->addr);
+
+        int file_size = file_length(page->file1);
+
+
+
+        pagedir_clear_page(cur->pagedir, fileFd->addr);
+        spage_destroy(fileFd->addr);
 
 
       }
