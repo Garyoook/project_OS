@@ -4,6 +4,8 @@
 #include <round.h>
 #include <stdio.h>
 #include <string.h>
+#include <kernel/hash.h>
+#include <vm/page.h>
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
@@ -17,16 +19,15 @@
 #include "threads/vaddr.h"
 #include "syscall.h"
 #include "vm/frame.h"
-#include "vm/page.h"
 
 // a macro to reduce duplicated code in arguments passing;
 #define \
   PUSH_STACK(esp, from, size) \
     { \
-        check_stack_overflow(bytes_used);\
         esp = esp - size;\
         memcpy(esp, from, size);\
         bytes_used += size;\
+        check_stack_overflow(bytes_used);\
     };
 
 static thread_func start_process NO_RETURN;
@@ -101,8 +102,7 @@ char *fn_copy;
   child->tid = tid;
   child->exit_status = -1;
   list_push_back(&thread_current()->child_list, &child->child_elem);
-
-  // inform the parent that the child has been added into the list. So
+  // inform the parent that the child has been added into the list.
   sema_up(&thread_current()->child_entry_sema);
 
   return tid;
@@ -126,7 +126,7 @@ static bool argument_passing(void **esp, char *file_name) {
   int bytes_used = 0;
 
   char *token, *save_ptr;
-  int argc = 0;
+  int argc= 0;
 
   char *argArr[ARGC];
   void *addrArr[ARGC];
@@ -168,6 +168,7 @@ static bool argument_passing(void **esp, char *file_name) {
   *(int *)*esp = argc;
 
   // last, the null pointer to the stack.
+
   void *nullPtr = NULL;
   PUSH_STACK(*esp, &nullPtr, sizeof(void *));
 
@@ -189,16 +190,11 @@ static void check_stack_overflow(int used) {
 static void
 start_process (void *file_name_)
 {
-  struct hash *haha = malloc(sizeof(struct hash));
-  thread_current()->spt_hash_table = haha;
-  hash_init(thread_current()->spt_hash_table, &page_hash, &page_less, NULL);
-
-
   char *file_name = file_name_;
   struct intr_frame if_;
   struct thread *cur = thread_current();
   bool success;
-
+  hash_init(&cur->spage_table , &page_hash, &page_less, NULL);
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -231,7 +227,6 @@ start_process (void *file_name_)
     thread_exit ();
 
   sema_down(&thread_current()->parent->child_entry_sema);
-
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -385,7 +380,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack(void **esp);
+bool setup_stack(void **esp);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -514,7 +509,7 @@ load (const char *cmdline, void (**eip) (void), void **esp)
 
 /* load() helpers. */
 
-bool install_page (void *upage, void *kpage, bool writable);
+
 
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
@@ -583,52 +578,56 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
-  file_seek (file, ofs);
-  while (read_bytes > 0 || zero_bytes > 0)
-    {
-      /* Calculate how to fill this page.
-         We will read PAGE_READ_BYTES bytes from FILE
-         and zero the final PAGE_ZERO_BYTES bytes. */
-      size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
-      size_t page_zero_bytes = PGSIZE - page_read_bytes;
-
-      /* Get a page of memory. */
-      uint8_t *kpage = palloc_get_page (PAL_USER);
-      if (kpage == NULL)
-        return false;
-
-      /* Load this page. */
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-        {
-          palloc_free_page (kpage);
-          return false;
-        }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
-
-      /* Add the page to the process's address space. */
-      if (!install_page (upage, kpage, writable))
-        {
-          palloc_free_page (kpage);
-          return false;
-        }
-
-      /* Advance. */
-      read_bytes -= page_read_bytes;
-      zero_bytes -= page_zero_bytes;
-      upage += PGSIZE;
-    }
+  create_spage(file, ofs, upage, read_bytes, zero_bytes, writable);
+//  file_seek (file, ofs);
+//  while (read_bytes > 0 || zero_bytes > 0)
+//    {
+//      /* Calculate how to fill this page.
+//         We will read PAGE_READ_BYTES bytes from FILE
+//         and zero the final PAGE_ZERO_BYTES bytes. */
+//      size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+//      size_t page_zero_bytes = PGSIZE - page_read_bytes;
+//
+////      /* Get a page of memory. */
+////      uint8_t *kpage = frame_create(PAL_USER, thread_current());
+////
+////      if (kpage == NULL)
+////        return false;
+//
+//
+////      /* Load this page. */
+////      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+////        {
+////          palloc_free_page (kpage);
+////          return false;
+////        }
+////      memset (kpage + page_read_bytes, 0, page_zero_bytes);
+////
+////      /* Add the page to the process's address space. */
+////      if (!install_page (upage, kpage, writable))
+////        {
+////          palloc_free_page (kpage);
+////          return false;
+////        }
+//
+//      /* Advance. */
+//      read_bytes -= page_read_bytes;
+//      zero_bytes -= page_zero_bytes;
+//      upage += PGSIZE;
+//    }
   return true;
 }
 
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
-static bool
+bool
 setup_stack(void **esp)
 {
   uint8_t *kpage;
   bool success = false;
 
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  kpage = frame_create(PAL_ZERO | PAL_USER, thread_current());
+//      palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);

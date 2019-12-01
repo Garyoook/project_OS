@@ -1,32 +1,35 @@
 //
-// Created by yg9418 on 23/11/19.
+// Created by wz5918 on 30/11/19.
 //
 
 #ifndef PINTOS_47_PAGE_H
 #define PINTOS_47_PAGE_H
 
-#include <stdint.h>
 #include <stdbool.h>
-#include "kernel/hash.h"
-#include "kernel/list.h"
+#include <stdint.h>
 #include "filesys/off_t.h"
+#include "filesys/file.h"
+#include "lib/kernel/hash.h"
+#include "list.h"
+#include "threads/palloc.h"
 
-enum page_status {
-  IN_FRAME_TABLE,
-  IN_SWAP_SLOT,
-  IN_FILESYS,
-  ALL_ZERO
-};
+#include "page.h"
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include "kernel/hash.h"
 
-struct spt_entry {
-  uint32_t *upage;
-  enum page_status status;
-  struct file *file;
-  size_t page_read_bytes;
-  size_t page_zero_bytes;
+#include "threads/malloc.h"
+
+struct spage{
+  struct file *file1;
   off_t offset;
-  bool writtable;
-  struct hash_elem hash_elem;
+  uint8_t *upage;
+  uint32_t read_bytes;
+  uint32_t zero_bytes;
+  bool writable;
+  struct hash_elem pelem;
+  bool for_lazy_load;
 };
 
 unsigned
@@ -37,8 +40,8 @@ page_less (const struct hash_elem *a, const struct hash_elem *b,
            void *aux);
 
 void sub_page_table_init();
-bool page_create(uint32_t *vaddr, struct file *file, enum page_status status, bool writable, off_t offset);
-struct spt_entry * page_lookup(uint32_t *vaddr);
-void page_destroy(uint32_t *vaddr);
-
+bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
+                  uint32_t read_bytes, uint32_t zero_bytes, bool writable);
+struct spage* lookup_spage(uint8_t *upage);
+void spage_destroy(uint8_t* upage);
 #endif //PINTOS_47_PAGE_H
