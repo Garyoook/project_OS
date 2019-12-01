@@ -53,15 +53,12 @@ struct spt_entry * page_lookup(uint32_t *vaddr) {
   struct spt_entry page;
   page.upage = pg_round_down(vaddr);
   struct hash_elem *e = hash_find(thread_current()->spt_hash_table, &page.hash_elem);
-  if(e){
-    return hash_entry(e,struct spt_entry, hash_elem);
-  }
-  return NULL;
+  return  e != NULL ? hash_entry(e,struct spt_entry, hash_elem) : NULL;
 }
 
 void page_destroy(uint32_t *vaddr) {
   struct spt_entry *page = page_lookup(vaddr);
-  if (!page) {
+  if (page == NULL) {
     return;
   }
   hash_delete(thread_current()->spt_hash_table, &page->hash_elem);
