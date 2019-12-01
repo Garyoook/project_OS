@@ -344,6 +344,7 @@ read(int fd, void *buffer, unsigned size) {
 
 int
 write(int fd, const void *buffer, unsigned size) {
+
   if (fd < STDOUT_FILENO || fd > FILE_LIMIT) {
     exit(EXIT_FAIL);
   }
@@ -474,7 +475,6 @@ mapid_t mmap(int fd, void *addr) {
 
 
 void munmap(mapid_t mapping) {
-  {
     struct thread *cur = thread_current();
     struct list_elem *e = list_begin(&cur->file_fd_list);
     while (e != list_end(&cur->file_fd_list)) {
@@ -491,17 +491,24 @@ void munmap(mapid_t mapping) {
           file_allow_write(fileFd->f);
         struct spage *page = lookup_spage(fileFd->addr);
 
-        int file_size = file_length(page->file1);
+        int file_size = file_length(fileFd->f);
+
+        char temp[file_size];
 
 
+        strlcpy(temp, fileFd->addr, (size_t) file_size);
+        file_allow_write(fileFd->f);
+        file_seek(fileFd->f, 0);
+        int k = write (fileFd->fd, temp, sizeof (temp) - 1);
 
-        pagedir_clear_page(cur->pagedir, fileFd->addr);
+
         spage_destroy(fileFd->addr);
+
 
 
       }
       e = e->next;
     }
-  }
+
 
 }
