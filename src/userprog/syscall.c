@@ -14,6 +14,7 @@
 #include "threads/synch.h"
 #include "devices/input.h"
 #include "threads/malloc.h"
+#include "vm/page.h"
 
 #define FILE_LIMIT 128
 #define FD_INIT 2
@@ -417,10 +418,34 @@ close(int fd) {
   }
 }
 
+bool overlaps(void* addr){
+  struct thread *cur = thread_current();
+  struct list_elem *e = list_begin(&cur->file_fd_list);
+  while (e != list_end(&cur->file_fd_list)) {
+    struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
+    e = e->next;
+
+    if (fileFd->addr + file_length(fileFd->f) > addr){
+      return true;
+    }
+
+  }
+  return false;
+}
+
 mapid_t mmap(int fd, void *addr) {
+
+  if (overlaps(addr)) return -1;
+
   int file_size = filesize(fd);
   if (fd == 0 || fd == 1 || file_size == 0 || addr == 0 || (uint32_t) addr % PGSIZE != 0) {
-    return 0;
+    return -1;
+  }
+
+  for (uint32_t a = 0; a < file_size; a += PGSIZE) {
+    if (lookup_spage(addr + a) != NULL) {
+      return -1;
+    }
   }
 
 
@@ -431,13 +456,39 @@ mapid_t mmap(int fd, void *addr) {
     e = e->next;
     if (fd == fileFd->fd){
       fileFd->addr = addr;
+      uint32_t zero_set = ((uint32_t)file_size) % PGSIZE;
+      create_spage(fileFd->f, 0, addr, (uint32_t) file_length(fileFd->f), PGSIZE - zero_set, true);
       return fd;
     }
   }
-  return 0;
+
+
+
+  return -1;
 }
 
 
 void munmap(mapid_t mapping) {
+  {
+    struct thread *cur = thread_current();
+    struct list_elem *e = list_begin(&cur->file_fd_list);
+    while (e != list_end(&cur->file_fd_list)) {
+      struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
+      if (fileFd->fd == mapping) {
+        if (fileFd->f == NULL || fileFd->tid != cur->tid) {
+          return;
+        }
+
+        if (fileFd->addr == NULL)
+          return;
+
+        if (!fileFd->reopened)
+          file_allow_write(fileFd->f);
+
+
+      }
+      e = e->next;
+    }
+  }
 
 }

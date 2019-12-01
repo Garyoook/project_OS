@@ -54,3 +54,13 @@ struct spage * lookup_spage(uint8_t* upage) {
   struct hash_elem *e = hash_find(&thread_current()->spage_table, &page.pelem);
   return e != NULL ? hash_entry(e, struct spage, pelem): NULL;
 }
+
+void spage_destroy(uint8_t* upage) {
+  struct spage *page = lookup_spage(upage);
+  if (!page) {
+    return;
+  }
+  hash_delete(&thread_current()->spage_table, &page->pelem);
+  free(page);
+
+}

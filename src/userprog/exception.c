@@ -184,8 +184,14 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
+  if (!is_user_vaddr(fault_addr) || fault_addr == NULL || fault_addr >= PHYS_BASE
+      || fault_addr < (void *) 0x08048000 || fault_addr > (f->esp - 32)) {
+    exit(-1);
+  }
 
-  struct spage* spage1 =  lookup_spage(fault_addr);
+
+  uint8_t *upage = pg_round_down(fault_addr);
+  struct spage* spage1 =  lookup_spage(upage);
 
   if (spage1 == NULL) {
     if (fault_addr >= f->esp - 32) {
@@ -209,7 +215,6 @@ page_fault (struct intr_frame *f)
     exit(-1);
   }
   } else {
-
     uint32_t read_bytes = spage1->read_bytes;
     uint32_t zero_bytes = spage1->zero_bytes;
     uint8_t *upage = spage1->upage;

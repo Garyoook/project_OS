@@ -121,6 +121,8 @@ struct thread
   struct list file_fd_list;         /* list for files of this process and
                                      * their corresponding information*/
 
+
+
   struct semaphore child_entry_sema;/* a semaphore to secure synchronization
                                      * when a child is added to the process's
                                      * children list*/
@@ -136,6 +138,7 @@ struct thread
   bool in_syscall;                  /* to indicate the process is running
                                      * with a system call*/
 #endif
+
 
 
     struct hash spage_table;
