@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <kernel/hash.h>
-
+#include "threads/thread.h"
 #include "threads/malloc.h"
 
 
@@ -40,18 +40,13 @@ bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
   new_page->read_bytes = read_bytes;
   new_page->zero_bytes = zero_bytes;
   new_page->writable = writable;
-  hash_insert(&spage_table, &new_page->pelem);
+  hash_insert(&thread_current()->spage_table, &new_page->pelem);
   return true;
 }
 
 struct spage * lookup_spage(uint8_t* upage) {
   struct spage page;
   page.upage = upage;
-
-  struct hash_elem *e = hash_find(&spage_table, &page.pelem);
-  if (e != NULL) {
-    return hash_entry(e, struct spage, pelem);
-  } else {
-    return NULL;
-  }
+  struct hash_elem *e = hash_find(&thread_current()->spage_table, &page.pelem);
+  return e != NULL ? hash_entry(e, struct spage, pelem): NULL;
 }

@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "fixed-point.h"
 #include "synch.h"
+#include "kernel/hash.h"
 
 /* List of all threads that are blocked. */
 struct list blocked_list;
@@ -136,6 +137,8 @@ struct thread
                                      * with a system call*/
 #endif
 
+
+    struct hash spage_table;
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
 };
