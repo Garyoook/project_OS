@@ -7,6 +7,7 @@
 #include "lib/kernel/list.h"
 #include "threads/thread.h"
 #include <string.h>
+#include "filesys/file.h"
 
 void frame_evict(void);
 
@@ -32,6 +33,10 @@ struct frame_entry * frame_create(uint32_t *page, off_t offset, struct file *fil
   f->td = thread_current();
   f->offset = offset;
   f->file = file;
+
+  if (file != NULL) {
+    f->file_size = file_length(file);
+  }
 
   list_push_back(&frame_table, &f->elem);
   return f;

@@ -15,6 +15,7 @@ struct frame_entry
   uint32_t *page;
   off_t offset;
   struct file *file;
+  int file_size;
   struct thread *td;
   struct list_elem elem;
   struct spt_entry* spt;

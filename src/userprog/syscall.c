@@ -380,16 +380,16 @@ write(int fd, const void *buffer, unsigned size) {
       }
 
       int result;
-      if (fileFd->mmaped) {
-        uint32_t *kaddr = pagedir_get_page(cur->pagedir, fileFd->md_addr);
-        //printf("Q\n");
-        memcpy(kaddr + fileFd->file_pos, buffer, size);
-        //printf("W\n");
-        // may overflow
-        return size;
-      } else {
+//      if (fileFd->mmaped) {
+//        uint32_t *kaddr = pagedir_get_page(cur->pagedir, fileFd->md_addr);
+//        //printf("Q\n");
+//        memcpy(kaddr + fileFd->file_pos, buffer, size);
+//        //printf("W\n");
+//        // may overflow
+//        return size;
+//      } else {
         result = file_write(fileFd->f, buffer, size);
-      }
+//      }
       file_deny_write(fileFd->f);
 
       return result;
@@ -406,11 +406,11 @@ seek(int fd, unsigned position) {
   while (e != list_end(&cur->file_fd_list)){
     struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
     if (fileFd->fd == fd ) {
-      if (fileFd->mmaped) {
-        fileFd->file_pos = position;
-      } else {
+//      if (fileFd->mmaped) {
+//        fileFd->file_pos = position;
+//      } else {
         file_seek(fileFd->f, position);
-      }
+//      }
     }
     e = e->next;
   }
@@ -478,29 +478,27 @@ mapid_t mmap(int fd, void *addr) {
         return -1;
       }
 
-      int page_no = ((uint32_t)file_size) / PGSIZE;
 //      uint32_t zero_set = ((uint32_t)file_size)  % PGSIZE;
 //
 //  off_t file_read_byte;
 
-//      printf("AAA:%d\n", file_size);
+      //printf("AAA:%d\n", file_size);
 //      printf("s:%d\n", PGSIZE);
 //      printf("z:%d\n", page_no);
 
       for (uint32_t a = 0; a < file_size; a += PGSIZE) {
-      //  printf("P:%d\n", a);
-        if (frame_lookup(addr + a) != NULL) {
-
-
+        if (page_lookup(addr + a) != NULL) {
           //lookup_page((uint32_t *) addr + a) != NULL) {
           //?
           return -1;
         }
       }
 //
-      page_create(addr, fileFd->f, IN_FILESYS, false, 0);
+
 
       for (uint32_t a = 0; a < file_size; a += PGSIZE) {
+       // printf("P:%d\n", a);
+        page_create(addr + a, fileFd->f, IN_FILESYS, false, 0);
         frame_create(addr + a, file_tell(fileFd->f), fileFd->f);
       }
 //      file_read_byte = file_read(fileFd->f, kaddr, file_size);
@@ -556,12 +554,9 @@ void munmap(mapid_t mapping)
 
       int file_size = file_length(frame->file);
 
-
-      off_t r = file_write_at(frame->file, pagedir_get_page(cur->pagedir, fileFd->md_addr), file_length(frame->file), 0);
-
       for (uint32_t a = 0; a < file_size; a += PGSIZE) {
+        file_write_at(frame->file, pagedir_get_page(cur->pagedir, fileFd->md_addr + a), frame->file_size - a, 0 + a);
         pagedir_clear_page(cur->pagedir, fileFd->md_addr + a);
-
         page_destroy(fileFd->md_addr + a);
         frame_destroy(fileFd->md_addr + a);
       }
