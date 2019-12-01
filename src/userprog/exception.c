@@ -37,7 +37,6 @@ static long long page_fault_cnt;
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
-int num = 2;
 
 /* Registers handlers for interrupts that can be caused by user
    programs.
@@ -200,6 +199,7 @@ page_fault (struct intr_frame *f)
     kpage = frame_create(PAL_USER, thread_current());
     if (kpage != NULL)
     {
+      if (num > 2048) exit(-1);
       success = install_page (((uint8_t *) PHYS_BASE) - num * PGSIZE, kpage, true);
       if (success){
 //        f->esp = PHYS_BASE - 2 * PGSIZE;
