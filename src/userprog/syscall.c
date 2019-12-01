@@ -460,10 +460,7 @@ mapid_t mmap(int fd, void *addr) {
     return -1;
   }
 
-
-
   // to check no overlapping
-
 
 //  void *kaddr = palloc_get_page(PAL_USER);
 //  if (kaddr == NULL)
