@@ -3,6 +3,7 @@
 #include <syscall-nr.h>
 #include <user/syscall.h>
 #include <string.h>
+#include "vm/frame.h"
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
 #include "threads/interrupt.h"
@@ -233,6 +234,24 @@ exit (int status) {
     release_all_locks(thread_current());
   }
 
+  struct hash_iterator i;
+  hash_first(&i, &cur->spage_table);
+
+  while (hash_next(&i)) {
+    struct spage *sp = hash_entry (hash_cur(&i), struct spage, pelem);
+    if (sp == NULL)
+      break;
+    pagedir_clear_page(cur->pagedir, sp->upage);
+  }
+//  struct list_elem *eframe = list_begin(&frame_table);
+//  while (eframe != NULL && eframe != list_end(&frame_table)) {
+//    struct frame *frame1 = list_entry(eframe, struct frame, f_elem);
+//    if (frame1->t == cur) {
+//      pagedir_clear_page(cur->pagedir, frame1->page);
+//    }
+//    eframe = eframe->next;
+//  }
+//  pagedir_destroy(cur->pagedir);
 //  intr_set_level(old_level);
   thread_exit();
 }

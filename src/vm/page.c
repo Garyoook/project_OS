@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <kernel/hash.h>
+#include "userprog/syscall.h"
+#include "userprog/pagedir.h"
 #include "threads/thread.h"
 #include "threads/malloc.h"
 
@@ -42,7 +44,32 @@ bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
   new_page->writable = writable;
   new_page->for_lazy_load = true;
   hash_insert(&thread_current()->spage_table, &new_page->pelem);
-//  printf("W%d\n", file_tell(file));
+ // printf("W%d\n", file_tell(file));
+
+
+  if (!writable) {
+    struct hash_iterator i;
+    struct thread *t = thread_current();
+    hash_first(&i, &t->spage_table);
+
+    while (hash_next(&i)) {
+      struct spage *sp = hash_entry (hash_cur(&i), struct spage, pelem);
+      if (sp == NULL)
+        break;
+      if (file == sp->file1 && !sp->writable) {
+        new_page->kpage = sp->kpage;
+
+        if (new_page->kpage != NULL) {
+          bool install_page = (pagedir_get_page(t->pagedir, upage) == NULL
+                               && pagedir_set_page(t->pagedir, upage, new_page->kpage, writable));
+          if (!install_page)
+            exit(-1);
+        }
+        break;
+      }
+    }
+  }
+
   bool something = *upage;
   file_seek(file, 0);
 //  printf("W%d\n", file_tell(file));

@@ -198,6 +198,7 @@ page_fault (struct intr_frame *f)
     uint8_t *kpage;
     bool success = false;
     kpage = frame_create(PAL_USER, thread_current());
+
     if (kpage != NULL)
     {
       if (num > 2048) exit(-1);
@@ -231,6 +232,7 @@ page_fault (struct intr_frame *f)
         size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
         uint8_t *kpage = frame_create(PAL_USER, thread_current());
+        spage1->kpage = kpage;
 
         if (kpage == NULL)
           exit(-1);

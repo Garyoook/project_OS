@@ -25,6 +25,7 @@ struct spage{
   struct file *file1;
   off_t offset;
   uint8_t *upage;
+  uint8_t *kpage;
   uint32_t read_bytes;
   uint32_t zero_bytes;
   bool writable;
