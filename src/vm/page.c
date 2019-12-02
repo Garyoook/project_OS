@@ -1,22 +1,18 @@
-//
-// Created by yg9418 on 23/11/19.
-//
 
-#include <stdbool.h>
-#include <stdio.h>
-#include "threads/thread.h"
-#include "threads/palloc.h"
 #include "page.h"
-#include "lib/kernel/list.h"
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <kernel/hash.h>
+#include "threads/thread.h"
 #include "threads/malloc.h"
-#include "kernel/hash.h"
-#include "threads/vaddr.h"
+
 
 
 unsigned
 page_hash (const struct hash_elem *e, void *aux UNUSED)
 {
-  const struct spt_entry *p = hash_entry (e, struct spt_entry, hash_elem);
+  const struct spage *p = hash_entry (e, struct spage, pelem);
   return hash_bytes (&p->upage, sizeof p->upage);
 }
 
@@ -25,50 +21,49 @@ bool
 page_less (const struct hash_elem *a, const struct hash_elem *b,
            void *aux UNUSED)
 {
-  const struct spt_entry *p1 = hash_entry (a, struct spt_entry, hash_elem);
-  const struct spt_entry *p2 = hash_entry (b, struct spt_entry, hash_elem);
+  const struct spage *p1 = hash_entry (a, struct spage, pelem);
+  const struct spage *p2 = hash_entry (b, struct spage, pelem);
 
   return p1->upage < p2->upage;
 }
 
-void sub_page_table_init() {
-  hash_init(thread_current()->spt_hash_table, &page_hash, &page_less, NULL);
-}
 
-
-bool page_create(uint32_t *vaddr, struct file *file, enum page_status status, bool writable, off_t offset) {
-  struct spt_entry *page = (struct spt_entry *) malloc(sizeof(struct spt_entry));
-  if (page == NULL) {
+bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
+             uint32_t read_bytes, uint32_t zero_bytes, bool writable){
+  struct spage *new_page = malloc(sizeof(struct spage));
+  if (new_page == NULL) {
     return false;
   }
-  page->upage = vaddr;
-  page->status = status;
-  page->file = file;
-  page->writtable = writable;
-  page->offset = offset;
-  hash_insert(thread_current()->spt_hash_table, &page->hash_elem);
-  return true;
+  new_page->file1 = file;
+  new_page->offset = ofs;
+  new_page->upage = upage;
+  new_page->read_bytes = read_bytes;
+  new_page->zero_bytes = zero_bytes;
+  new_page->writable = writable;
+  new_page->for_lazy_load = true;
+  hash_insert(&thread_current()->spage_table, &new_page->pelem);
+//  printf("W%d\n", file_tell(file));
+  bool something = *upage;
+  file_seek(file, 0);
+//  printf("W%d\n", file_tell(file));
+//  *upage;
+//  printf("PPPPPPPPPPPPPPPPPage addr remembered: %u\n", (uint32_t) *upage);
+  return (bool) something;
 }
 
-struct spt_entry * page_lookup(uint32_t *vaddr) {
-  struct spt_entry *page= malloc(sizeof(struct spt_entry));
-  page->upage = pg_round_down(vaddr);
-  struct hash_elem *e = hash_find(thread_current()->spt_hash_table, &page->hash_elem);
-  free(page);
-  if(e){
-    return hash_entry(e,struct spt_entry, hash_elem);
-  }
-  return NULL;
+struct spage * lookup_spage(uint8_t* upage) {
+  struct spage page;
+  page.upage = upage;
+  struct hash_elem *e = hash_find(&thread_current()->spage_table, &page.pelem);
+  return e != NULL ? hash_entry(e, struct spage, pelem): NULL;
 }
 
-void page_destroy(uint32_t *vaddr) {
-  struct spt_entry *page = page_lookup(vaddr);
+void spage_destroy(uint8_t* upage) {
+  struct spage *page = lookup_spage(upage);
   if (!page) {
     return;
   }
-  hash_delete(thread_current()->spt_hash_table, &page->hash_elem);
+  hash_delete(&thread_current()->spage_table, &page->pelem);
   free(page);
+
 }
-
-
-
