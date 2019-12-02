@@ -502,6 +502,7 @@ void munmap(mapid_t mapping) {
         int k = write (fileFd->fd, temp, sizeof (temp) - 1);
 
 
+        pagedir_clear_page(cur->pagedir, fileFd->addr);
         spage_destroy(fileFd->addr);
 
 
