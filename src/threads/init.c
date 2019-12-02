@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <vm/frame.h>
 #include "kernel/hash.h"
 #include "devices/kbd.h"
 #include "devices/input.h"
@@ -23,9 +24,6 @@
 #include "threads/palloc.h"
 #include "threads/pte.h"
 #include "threads/thread.h"
-#include "vm/frame.h"
-#include "vm/page.h"
-
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "userprog/exception.h"
@@ -40,6 +38,7 @@
 #include "devices/ide.h"
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
+#include "vm/page.h"
 #endif
 
 /* Page directory with kernel mappings only. */
@@ -93,7 +92,9 @@ main (void)
      then enable console locking. */
   thread_init ();
   console_init ();
-  frame_table_init();
+
+
+  list_init(&frame_table);
 
   /* Greet user. */
   printf ("Pintos booting with %'"PRIu32" kB RAM...\n",

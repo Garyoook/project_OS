@@ -121,6 +121,8 @@ struct thread
   struct list file_fd_list;         /* list for files of this process and
                                      * their corresponding information*/
 
+
+
   struct semaphore child_entry_sema;/* a semaphore to secure synchronization
                                      * when a child is added to the process's
                                      * children list*/
@@ -137,8 +139,9 @@ struct thread
                                      * with a system call*/
 #endif
 
-    struct hash *spt_hash_table;
 
+
+    struct hash spage_table;
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
 };

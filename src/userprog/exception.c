@@ -3,26 +3,40 @@
 #include <stdio.h>
 #include "filesys/file.h"
 #include <string.h>
+#include "threads/vaddr.h"
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "syscall.h"
-#include "vm/frame.h"
 #include "vm/page.h"
-#include "threads/malloc.h"
-#include "threads/palloc.h"
-#include "threads/vaddr.h"
+#include "userprog/process.h"
+#include <debug.h>
+#include <inttypes.h>
+#include <round.h>
+#include <stdio.h>
+#include <string.h>
+#include <kernel/hash.h>
+#include <vm/page.h>
+#include "userprog/gdt.h"
 #include "userprog/pagedir.h"
-#include "process.h"
+#include "userprog/tss.h"
+
+#include "filesys/file.h"
+#include "filesys/filesys.h"
+#include "threads/flags.h"
+#include "threads/interrupt.h"
+#include "threads/palloc.h"
+#include "threads/malloc.h"
+#include "threads/thread.h"
+#include "threads/vaddr.h"
+#include "syscall.h"
+#include "vm/frame.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
-int page_shift = 2;
-
-void safe_exit();
 
 /* Registers handlers for interrupts that can be caused by user
    programs.
@@ -121,17 +135,6 @@ kill (struct intr_frame *f)
     }
 }
 
-bool
-install_page (void *upage, void *kpage, bool writable)
-{
-  struct thread *t = thread_current ();
-
-  /* Verify that there's not already a page at that virtual
-     address, then map our page there. */
-  return (pagedir_get_page (t->pagedir, upage) == NULL
-          && pagedir_set_page (t->pagedir, upage, kpage, writable));
-}
-
 /* Page fault handler.  This is a skeleton that must be filled in
    to implement virtual memory.  Some solutions to task 2 may
    also require modifying this code.
@@ -143,6 +146,17 @@ install_page (void *upage, void *kpage, bool writable)
    can find more information about both of these in the
    description of "Interrupt 14--Page Fault Exception (#PF)" in
    [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
+bool
+install_page (void *upage, void *kpage, bool writable)
+{
+  struct thread *t = thread_current ();
+
+  /* Verify that there's not already a page at that virtual
+     address, then map our page there. */
+  return (pagedir_get_page (t->pagedir, upage) == NULL
+          && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+
 static void
 page_fault (struct intr_frame *f) 
 {
@@ -170,41 +184,46 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  /***
-   * wt Part start: for stack growth
-   */
-  struct spt_entry* spage1 = page_lookup(fault_addr);
+
+  if (!is_user_vaddr(fault_addr) || fault_addr == NULL || fault_addr >= PHYS_BASE
+      || fault_addr < (void *) 0x08048000) {
+    exit(-1);
+  }
+
+  uint8_t *upage = pg_round_down(fault_addr);
+  struct spage* spage1 =  lookup_spage(upage);
 
   if (spage1 == NULL) {
     if (fault_addr >= f->esp - 32) {
-      uint8_t *kpage;
-      bool success = false;
-      kpage = frame_create(PAL_USER, thread_current(), NULL);
-      if (kpage != NULL)
-      {
-        success = install_page (((uint8_t *) PHYS_BASE) - page_shift * PGSIZE, kpage, true);
-        if (success){
+    uint8_t *kpage;
+    bool success = false;
+    kpage = frame_create(PAL_USER, thread_current());
+
+    if (kpage != NULL)
+    {
+      if (num > 2048) exit(-1);
+      success = install_page (((uint8_t *) PHYS_BASE) - num * PGSIZE, kpage, true);
+      if (success){
 //        f->esp = PHYS_BASE - 2 * PGSIZE;
-          page_shift++;
-          thread_current()->stack = PHYS_BASE - PGSIZE;
-        }
-        else {
-          palloc_free_page(kpage);
-          exit(-1);
-        }
+        num++;
+        thread_current()->stack = PHYS_BASE - PGSIZE;
       }
-      return;} else {
+      else {
+        palloc_free_page(kpage);
+        exit(-1);
+      }
+    }
+    return;} else {
       exit(-1);
     }
   } else {
-
-    uint32_t read_bytes = spage1->page_read_bytes;
-    uint32_t zero_bytes = spage1->page_zero_bytes;
+    uint32_t read_bytes = spage1->read_bytes;
+    uint32_t zero_bytes = spage1->zero_bytes;
     uint8_t *upage = spage1->upage;
     off_t ofs = spage1->offset;
     bool writable = spage1->writable;
     if (not_present) {
-      file_seek(spage1->file, ofs);
+      file_seek(spage1->file1, ofs);
       while (read_bytes > 0 || zero_bytes > 0) {
         /* Calculate how to fill this page.
            We will read PAGE_READ_BYTES bytes from FILE
@@ -212,13 +231,14 @@ page_fault (struct intr_frame *f)
         size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
         size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-        uint8_t *kpage = frame_create(PAL_USER, thread_current(), NULL);
+        uint8_t *kpage = frame_create(PAL_USER, thread_current());
+        spage1->kpage = kpage;
 
         if (kpage == NULL)
           exit(-1);
 
         /* Load this page. */
-        if (file_read(spage1->file, kpage, page_read_bytes) != (int) page_read_bytes) {
+        if (file_read(spage1->file1, kpage, page_read_bytes) != (int) page_read_bytes) {
           palloc_free_page(kpage);
           exit(-1);
         }
@@ -239,46 +259,8 @@ page_fault (struct intr_frame *f)
     }
 
   }
-  /***
-   * wt Part end
-   */
 
-
-  /***
-   * ni Part start: for mmap
-   */
-  struct thread *cur = thread_current();
-
-  if (!is_user_vaddr(fault_addr) || fault_addr == NULL || fault_addr >= PHYS_BASE
-      || fault_addr < (void *) 0x08048000 || fault_addr > (f->esp - 32)) {
-    safe_exit();
-  }
-
-  uint8_t *upage = pg_round_down(fault_addr);
-
-  struct spt_entry *sf = page_lookup((uint32_t *)upage);
-
-  if (sf == NULL) {
-    safe_exit();
-  }
-
-  struct frame_entry *frame = frame_lookup(upage);
-
-  if (sf->status == IN_FILESYS) {
-    struct file *this_file = frame->file;
-    int file_size = file_length(this_file);
-    uint32_t zero_set = ((uint32_t)file_size) % PGSIZE;
-
-    file_reopen(this_file);
-    load_segment(this_file, frame->offset, upage, (uint32_t)file_size, PGSIZE - zero_set, true);
-
-    return;
-  }
-  /***
-   * ni Part end
-   */
-
-  if (cur->in_syscall) {
+  if (thread_current()->in_syscall) {
     exit(EXIT_FAIL);
   } else if (!user) {
     kill(f);
@@ -293,10 +275,5 @@ page_fault (struct intr_frame *f)
           write ? "writing" : "reading",
           user ? "user" : "kernel");
   kill (f);
-}
-
-void safe_exit() {
-  free(thread_current()->spt_hash_table);
-  exit(-1);
 }
 

@@ -16,7 +16,7 @@ struct child {
 
 struct lock syscall_lock;
 char *current_file_name;
-
+int num;
 void syscall_init (void);
 void exit (int status);
 bool safe_access(void const *esp);

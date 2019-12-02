@@ -4,23 +4,21 @@
 #include <user/syscall.h>
 #include <string.h>
 #include "vm/frame.h"
-#include "threads/palloc.h"
-#include "vm/page.h"
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "process.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "pagedir.h"
 #include "threads/synch.h"
 #include "devices/input.h"
 #include "threads/malloc.h"
-#include "process.h"
+#include "vm/page.h"
 
 #define FILE_LIMIT 128
 #define FD_INIT 2
-#define MD_INIT 0
 
 static void syscall_handler (struct intr_frame *);
 
@@ -33,25 +31,22 @@ struct fileWithFd {
   struct file *f;
   const char *name;
   int fd;
-
-  int md;
-  void *md_addr;
-  int file_size;
-  off_t file_pos;
   tid_t tid;
-  bool mmaped;
   bool reopened;
+  void* addr;
+  bool dirty;
+
   struct list_elem file_elem;
 };
 
 // the initial file descriptor number;
 int currentFd = FD_INIT;
-int currentMd = MD_INIT;
 
 void
 syscall_init (void)
 {
   lock_init(&syscall_lock);
+  num = 2;
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -99,7 +94,6 @@ syscall_handler (struct intr_frame *f UNUSED)
   void **snd = (void **)(f->esp) + 2;
   void **trd = (void **)(f->esp) + 3;
 
-  //printf("IIIIIIIIIIIII: %d\n", syscall_num);
   switch (syscall_num) {
     case SYS_EXEC:
       if (!safe_access(fst)) f->eax = (uint32_t) EXIT_FAIL;
@@ -170,6 +164,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       exit_if_unsafe(fst);
       munmap(*(int *)fst);
       break;
+
     default:break;
   }
 }
@@ -193,8 +188,8 @@ halt(void) {
 
 void
 exit (int status) {
-  enum intr_level old_level;
-  old_level = intr_disable();
+//  enum intr_level old_level;
+//  old_level = intr_disable();
   struct thread *cur = thread_current();
   // termination message:
   printf("%s: exit(%d)\n", cur->name, status);
@@ -226,6 +221,9 @@ exit (int status) {
   struct list_elem *ef = list_begin(&cur->file_fd_list);
   while (ef != NULL && ef != list_end(&cur->file_fd_list)){
     struct fileWithFd *fileFd = list_entry(ef, struct fileWithFd, file_elem);
+    if (pagedir_is_dirty(cur->pagedir, fileFd->addr)) {
+      munmap(fileFd->fd);
+    }
     list_remove(ef);
     ef = ef->next;
     free(fileFd);
@@ -236,7 +234,25 @@ exit (int status) {
     release_all_locks(thread_current());
   }
 
-  intr_set_level(old_level);
+  struct hash_iterator i;
+  hash_first(&i, &cur->spage_table);
+
+  while (hash_next(&i)) {
+    struct spage *sp = hash_entry (hash_cur(&i), struct spage, pelem);
+    if (sp == NULL)
+      break;
+    pagedir_clear_page(cur->pagedir, sp->upage);
+  }
+//  struct list_elem *eframe = list_begin(&frame_table);
+//  while (eframe != NULL && eframe != list_end(&frame_table)) {
+//    struct frame *frame1 = list_entry(eframe, struct frame, f_elem);
+//    if (frame1->t == cur) {
+//      pagedir_clear_page(cur->pagedir, frame1->page);
+//    }
+//    eframe = eframe->next;
+//  }
+//  pagedir_destroy(cur->pagedir);
+//  intr_set_level(old_level);
   thread_exit();
 }
 
@@ -260,9 +276,7 @@ remove(const char *file) {
 int
 open(const char *file) {
   bool reopened = false;
-  lock_acquire(&syscall_lock);
   struct file *file1 = filesys_open(file);
-  lock_release(&syscall_lock);
   struct thread *cur = thread_current();
 
   if (!strcmp(file, cur->name)) {
@@ -279,22 +293,21 @@ open(const char *file) {
   if (currentFd <= FILE_LIMIT) {
     lock_acquire(&syscall_lock);
     currentFd++;
+    lock_release(&syscall_lock);
 
     // initialize the fields of a created file and push it into
     // the file list of current thread.
     struct fileWithFd *fileFd =
         (struct fileWithFd *) malloc(sizeof(struct fileWithFd));
     if (fileFd == NULL) {
-      lock_release(&syscall_lock);
       return EXIT_FAIL;
     }
     fileFd->name = file;
     fileFd->fd = currentFd;
-    lock_release(&syscall_lock);
     fileFd->f = file1;
     fileFd->tid = cur->tid;
     fileFd->reopened = reopened;
-    fileFd->mmaped =false;
+    fileFd->dirty = false;
     if (fileFd->reopened) {
       file_reopen(fileFd->f);
     }
@@ -327,7 +340,6 @@ filesize(int fd) {
 
 int
 read(int fd, void *buffer, unsigned size) {
-
   if (fd < STDOUT_FILENO || fd > FILE_LIMIT) {
     exit(EXIT_FAIL);
   }
@@ -340,11 +352,9 @@ read(int fd, void *buffer, unsigned size) {
   while (e != list_end(&cur->file_fd_list)){
     struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
     if (fileFd->fd == fd) {
-
         if (fileFd->tid != cur->tid) {
           exit(EXIT_FAIL);
         }
-
       if (fileFd->f != NULL) {
         return file_read(fileFd->f, buffer, size);
       } else {
@@ -353,7 +363,6 @@ read(int fd, void *buffer, unsigned size) {
     }
     e = e->next;
   }
-
   return 0;
 }
 
@@ -372,26 +381,16 @@ write(int fd, const void *buffer, unsigned size) {
   while (e != list_end(&cur->file_fd_list)){
     struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
     if (fileFd->fd == fd ) {
+
       if (fileFd->tid != cur->tid) {
         exit(EXIT_FAIL);
       } else {
         if (!fileFd->reopened)
           file_allow_write(fileFd->f);
       }
-
-      int result;
-//      if (fileFd->mmaped) {
-//        uint32_t *kaddr = pagedir_get_page(cur->pagedir, fileFd->md_addr);
-//        //printf("Q\n");
-//        memcpy(kaddr + fileFd->file_pos, buffer, size);
-//        //printf("W\n");
-//        // may overflow
-//        return size;
-//      } else {
-        result = file_write(fileFd->f, buffer, size);
-//      }
+      int result = file_write(fileFd->f, buffer, size);
       file_deny_write(fileFd->f);
-
+      fileFd->dirty = true;
       return result;
     }
     e = e->next;
@@ -406,11 +405,7 @@ seek(int fd, unsigned position) {
   while (e != list_end(&cur->file_fd_list)){
     struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
     if (fileFd->fd == fd ) {
-//      if (fileFd->mmaped) {
-//        fileFd->file_pos = position;
-//      } else {
-        file_seek(fileFd->f, position);
-//      }
+      file_seek(fileFd->f, position);
     }
     e = e->next;
   }
@@ -423,11 +418,7 @@ tell(int fd) {
   while (e != list_end(&cur->file_fd_list)){
     struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
     if (fileFd->fd == fd ) {
-      if (fileFd->mmaped) {
-        return (unsigned)fileFd->file_pos;
-      } else {
-        return (unsigned int) file_tell(fileFd->f);
-      }
+      return (unsigned int) file_tell(fileFd->f);
     }
     e = e->next;
   }
@@ -454,110 +445,99 @@ close(int fd) {
   }
 }
 
+bool overlaps(void* addr){
+  struct thread *cur = thread_current();
+  struct list_elem *e = list_begin(&cur->file_fd_list);
+  while (e != list_end(&cur->file_fd_list)) {
+    struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
+    e = e->next;
+
+    if (fileFd->addr + file_length(fileFd->f) > addr){
+      return true;
+    }
+
+  }
+  return false;
+}
+
 mapid_t mmap(int fd, void *addr) {
+
+  if (addr > (PHYS_BASE) - num * PGSIZE) {
+    return -1;
+  }
+
+  if (overlaps(addr)) return -1;
+
   int file_size = filesize(fd);
+
+
   if (fd == 0 || fd == 1 || file_size == 0 || addr == 0 || (uint32_t) addr % PGSIZE != 0) {
     return -1;
   }
 
-  // to check no overlapping
+  for (uint32_t a = 0; a < file_size; a += PGSIZE) {
+    if (lookup_spage(addr + a) != NULL) {
+      return -1;
+    }
+  }
 
-//  void *kaddr = palloc_get_page(PAL_USER);
-//  if (kaddr == NULL)
-//    return -1;
 
   struct thread *cur = thread_current();
   struct list_elem *e = list_begin(&cur->file_fd_list);
   while (e != list_end(&cur->file_fd_list)) {
     struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
-    if (fileFd->fd == fd) {
-      if (fileFd->f == NULL || fileFd->tid != cur->tid) {
-        return -1;
-      }
-
-//      uint32_t zero_set = ((uint32_t)file_size)  % PGSIZE;
-//
-//  off_t file_read_byte;
-
-      //printf("AAA:%d\n", file_size);
-//      printf("s:%d\n", PGSIZE);
-//      printf("z:%d\n", page_no);
-
-      for (uint32_t a = 0; a < file_size; a += PGSIZE) {
-        if (page_lookup(addr + a) != NULL) {
-          //lookup_page((uint32_t *) addr + a) != NULL) {
-          //?
-          return -1;
-        }
-      }
-//
-
-
-      for (uint32_t a = 0; a < file_size; a += PGSIZE) {
-       // printf("P:%d\n", a);
-        page_create(addr + a, fileFd->f, IN_FILESYS, false, 0, 0);
-        frame_create(addr + a, file_tell(fileFd->f), fileFd->f);
-      }
-//      file_read_byte = file_read(fileFd->f, kaddr, file_size);
-//
-//      if (file_read_byte != file_size) {
-//        palloc_free_page(kaddr);
-//        return -1;
-//      }
-//
-//      if (zero_set != 0) {
-//        //find the address of ending of the file
-//        memset(kaddr + file_size, 0, (size_t) PGSIZE - zero_set);
-//      }
-//
-//      if ( !(pagedir_get_page (cur->pagedir, addr) == NULL
-//            && pagedir_set_page (cur->pagedir, addr, kaddr, false))) {
-//        palloc_free_page(kaddr);
-//        return -1;
-//      }
-
-      fileFd->md = currentMd;
-      fileFd->mmaped = true;
-      fileFd->md_addr = addr;
-      currentMd++;
-      fileFd->file_size = file_size;
-      fileFd->file_pos = file_tell(fileFd->f);
-      return fileFd->md;
+    e = e->next;
+    if (fd == fileFd->fd){
+      fileFd->addr = addr;
+      uint32_t zero_set = ((uint32_t)file_size) % PGSIZE;
+      create_spage(fileFd->f, file_tell(fileFd->f), addr, (uint32_t) file_length(fileFd->f), PGSIZE - zero_set, true);
+      return fd;
     }
-      e = e -> next;
   }
+
+
+
   return -1;
 }
 
-void munmap(mapid_t mapping)
-{
-  struct thread *cur = thread_current();
-  struct list_elem *e = list_begin(&cur->file_fd_list);
-  while (e != list_end(&cur->file_fd_list)) {
-    struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
-    if (fileFd->md == mapping) {
-      if (fileFd->f == NULL || fileFd->tid != cur->tid) {
-        return;
-      }
 
-      if (fileFd->md_addr == NULL)
-        return;
+void munmap(mapid_t mapping) {
+    struct thread *cur = thread_current();
+    struct list_elem *e = list_begin(&cur->file_fd_list);
+    while (e != list_end(&cur->file_fd_list)) {
+      struct fileWithFd *fileFd = list_entry(e, struct fileWithFd, file_elem);
+      if (fileFd->fd == mapping) {
+        if (fileFd->f == NULL || fileFd->tid != cur->tid) {
+          return;
+        }
 
-      if (!fileFd->reopened)
+        if (fileFd->addr == NULL)
+          return;
+
+        if (!fileFd->reopened)
+          file_allow_write(fileFd->f);
+        struct spage *page = lookup_spage(fileFd->addr);
+
+        int file_size = file_length(fileFd->f);
+
         file_allow_write(fileFd->f);
-      //printf("OIIIIIII\n");
-      struct frame_entry *frame = frame_lookup(fileFd->md_addr);
-      struct spt_entry *page = page_lookup(fileFd->md_addr);
+        if (!fileFd->dirty) {
 
-      int file_size = file_length(frame->file);
+          file_write_at(fileFd->f, fileFd->addr, file_size, 0);
+        }file_seek(fileFd->f, 0);
 
-      for (uint32_t a = 0; a < file_size; a += PGSIZE) {
-        file_write_at(frame->file, pagedir_get_page(cur->pagedir, fileFd->md_addr + a), frame->file_size - a, 0 + a);
-        pagedir_clear_page(cur->pagedir, fileFd->md_addr + a);
-        page_destroy(fileFd->md_addr + a);
-        frame_destroy(fileFd->md_addr + a);
+
+//        printf("String to be written in: \n%s\n", temp);
+//        printf("String in target position: \n%s\n", (char *) fileFd->addr);
+
+        pagedir_clear_page(cur->pagedir, fileFd->addr);
+        spage_destroy(fileFd->addr);
+
+
+
       }
+      e = e->next;
     }
-    e = e->next;
-  }
+
+
 }
