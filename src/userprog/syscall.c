@@ -493,14 +493,13 @@ void munmap(mapid_t mapping) {
 
         int file_size = file_length(fileFd->f);
 
-        char temp[file_size];
-
-
-        strlcpy(temp, fileFd->addr, (size_t) file_size);
         file_allow_write(fileFd->f);
+        file_write_at (fileFd->f, fileFd->addr, file_size, 0);
         file_seek(fileFd->f, 0);
-        int k = write (fileFd->fd, temp, sizeof (temp) - 1);
 
+
+//        printf("String to be written in: \n%s\n", temp);
+//        printf("String in target position: \n%s\n", (char *) fileFd->addr);
 
         pagedir_clear_page(cur->pagedir, fileFd->addr);
         spage_destroy(fileFd->addr);
