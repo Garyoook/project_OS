@@ -195,25 +195,27 @@ page_fault (struct intr_frame *f)
 
   if (spage1 == NULL) {
     if (fault_addr >= f->esp - 32) {
-    uint8_t *kpage;
-    bool success = false;
-    kpage = frame_create(PAL_USER, thread_current());
+      uint8_t *kpage;
+      bool success = false;
+      kpage = frame_create(PAL_USER, thread_current());
 
-    if (kpage != NULL)
-    {
-      if (num > 2048) exit(-1);
-      success = install_page (((uint8_t *) PHYS_BASE) - num * PGSIZE, kpage, true);
-      if (success){
-//        f->esp = PHYS_BASE - 2 * PGSIZE;
-        num++;
-        thread_current()->stack = PHYS_BASE - PGSIZE;
+      if (kpage != NULL) {
+        // growth stack
+        if (num > 2048) exit(-1);
+        success = install_page (((uint8_t *) PHYS_BASE) - num * PGSIZE, kpage, true);
+        if (success){
+          num++;
+          thread_current()->stack = PHYS_BASE - PGSIZE;
+        } else {
+          palloc_free_page(kpage);
+          exit(-1);
+        }
+      } else {
+        // frame eviction
+        frame_evict();
       }
-      else {
-        palloc_free_page(kpage);
-        exit(-1);
-      }
-    }
-    return;} else {
+    return;
+    } else {
       exit(-1);
     }
   } else {

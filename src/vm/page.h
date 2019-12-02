@@ -31,6 +31,8 @@ struct spage{
   bool writable;
   struct hash_elem pelem;
   bool for_lazy_load;
+  int block_index;
+  bool evicted;
 };
 
 unsigned

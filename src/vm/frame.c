@@ -1,11 +1,15 @@
-
 #include "threads/malloc.h"
 #include <debug.h>
 #include "threads/thread.h"
 #include <string.h>
+#include "userprog/pagedir.h"
 #include "frame.h"
 #include "swap.h"
+#include "page.h"
+
 void frame_delete(struct frame* frame1);
+
+int block_index = 0;
 
 void* frame_create(enum palloc_flags flags, struct thread *thread1) {
   struct frame *f = malloc(sizeof(struct frame));
@@ -23,9 +27,15 @@ void frame_delete(struct frame* frame1){
 
 void frame_evict() {
   struct frame *f = list_entry(list_begin(&frame_table), struct frame, f_elem);
-  write_to_block(f->frame, 0);
-  palloc_free_page(f->page);
-
+  f->page = NULL;
+  pagedir_clear_page(f->t->pagedir, f->page);
+  write_to_block(f->frame, block_index);
+  struct spage *evicted_page = lookup_spage(f->page);
+  evicted_page->block_index = block_index;
+  evicted_page->evicted = true;
+  block_index++;
+  list_remove(&f->f_elem);
+  free(f);
 }
 
 void frame_update() {
