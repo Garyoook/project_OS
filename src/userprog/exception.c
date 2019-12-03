@@ -54,7 +54,7 @@ static void page_fault (struct intr_frame *);
    Refer to [IA32-v3a] section 5.15 "Exception and Interrupt
    Reference" for a description of each of these exceptions. */
 void
-exception_init (void) 
+exception_init (void)
 {
   /* These exceptions can be raised explicitly by a user program,
      e.g. via the INT, INT3, INTO, and BOUND instructions.  Thus,
@@ -89,14 +89,14 @@ exception_init (void)
 
 /* Prints exception statistics. */
 void
-exception_print_stats (void) 
+exception_print_stats (void)
 {
   printf ("Exception: %lld page faults\n", page_fault_cnt);
 }
 
 /* Handler for an exception (probably) caused by a user process. */
 static void
-kill (struct intr_frame *f) 
+kill (struct intr_frame *f)
 {
   /* This interrupt is one (probably) caused by a user process.
      For example, the process might have tried to access unmapped
@@ -105,7 +105,7 @@ kill (struct intr_frame *f)
      the kernel.  Real Unix-like operating systems pass most
      exceptions back to the process via signals, but we don't
      implement them. */
-     
+
   /* The interrupt frame's code segment value tells us where the
      exception originated. */
   switch (f->cs)
@@ -116,7 +116,7 @@ kill (struct intr_frame *f)
       printf ("%s: dying due to interrupt %#04x (%s).\n",
               thread_name (), f->vec_no, intr_name (f->vec_no));
       intr_dump_frame (f);
-      thread_exit (); 
+      thread_exit ();
 
     case SEL_KCSEG:
       /* Kernel's code segment, which indicates a kernel bug.
@@ -124,7 +124,7 @@ kill (struct intr_frame *f)
          may cause kernel exceptions--but they shouldn't arrive
          here.)  Panic the kernel to make the point.  */
       intr_dump_frame (f);
-      PANIC ("Kernel bug - unexpected interrupt in kernel"); 
+      PANIC ("Kernel bug - unexpected interrupt in kernel");
 
     default:
       /* Some other code segment?  Shouldn't happen.  Panic the
@@ -158,7 +158,7 @@ install_page (void *upage, void *kpage, bool writable)
 }
 
 static void
-page_fault (struct intr_frame *f) 
+page_fault (struct intr_frame *f)
 {
   bool not_present;  /* True: not-present page, false: writing r/o page. */
   bool write;        /* True: access was write, false: access was read. */
@@ -191,39 +191,41 @@ page_fault (struct intr_frame *f)
   }
 
   uint8_t *upage = pg_round_down(fault_addr);
-  struct spage* spage1 =  lookup_spage(upage);
+  struct spage* sup_page =  lookup_spage(upage);
 
-  if (spage1 == NULL) {
+  if (sup_page == NULL) {
     if (fault_addr >= f->esp - 32) {
     uint8_t *kpage;
     bool success = false;
     kpage = frame_create(PAL_USER, thread_current());
-
-    if (kpage != NULL)
-    {
-      if (num > 2048) exit(-1);
-      success = install_page (((uint8_t *) PHYS_BASE) - num * PGSIZE, kpage, true);
-      if (success){
+      if (kpage != NULL) {
+       if (num > 2048) {
+         exit(-1);
+       }
+       success = install_page (((uint8_t *) PHYS_BASE) - num * PGSIZE, kpage, true);
+       if (success){
 //        f->esp = PHYS_BASE - 2 * PGSIZE;
         num++;
         thread_current()->stack = PHYS_BASE - PGSIZE;
-      }
-      else {
+        } else {
         palloc_free_page(kpage);
         exit(-1);
+       }
+    } else {
+        frame_evict(kpage);
       }
-    }
-    return;} else {
+    return;
+    } else {
       exit(-1);
     }
   } else {
-    uint32_t read_bytes = spage1->read_bytes;
-    uint32_t zero_bytes = spage1->zero_bytes;
-    uint8_t *upage = spage1->upage;
-    off_t ofs = spage1->offset;
-    bool writable = spage1->writable;
+    uint32_t read_bytes = sup_page->read_bytes;
+    uint32_t zero_bytes = sup_page->zero_bytes;
+    uint8_t *sup_upage = sup_page->upage;
+    off_t ofs = sup_page->offset;
+    bool writable = sup_page->writable;
     if (not_present) {
-      file_seek(spage1->file1, ofs);
+      file_seek(sup_page->file1, ofs);
       while (read_bytes > 0 || zero_bytes > 0) {
         /* Calculate how to fill this page.
            We will read PAGE_READ_BYTES bytes from FILE
@@ -232,20 +234,20 @@ page_fault (struct intr_frame *f)
         size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
         uint8_t *kpage = frame_create(PAL_USER, thread_current());
-        spage1->kpage = kpage;
+        sup_page->kpage = kpage;
 
         if (kpage == NULL)
           exit(-1);
 
         /* Load this page. */
-        if (file_read(spage1->file1, kpage, page_read_bytes) != (int) page_read_bytes) {
+        if (file_read(sup_page->file1, kpage, page_read_bytes) != (int) page_read_bytes) {
           palloc_free_page(kpage);
           exit(-1);
         }
         memset(kpage + page_read_bytes, 0, page_zero_bytes);
 
         /* Add the page to the process's address space. */
-        if (!install_page(upage, kpage, writable)) {
+        if (!install_page(sup_upage, kpage, writable)) {
           palloc_free_page(kpage);
           exit(-1);
         }
@@ -253,7 +255,7 @@ page_fault (struct intr_frame *f)
         /* Advance. */
         read_bytes -= page_read_bytes;
         zero_bytes -= page_zero_bytes;
-        upage += PGSIZE;
+        sup_upage += PGSIZE;
       }
       return;
     }

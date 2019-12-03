@@ -31,6 +31,8 @@ struct spage{
   bool writable;
   struct hash_elem pelem;
   bool for_lazy_load;
+  int reclaim_index;         /*index for reclaimation */
+  bool evicted;              /*if the mapped frame of this page is evicted or not */
 };
 
 unsigned
@@ -45,4 +47,4 @@ bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
                   uint32_t read_bytes, uint32_t zero_bytes, bool writable);
 struct spage* lookup_spage(uint8_t *upage);
 void spage_destroy(uint8_t* upage);
-#endif //PINTOS_47_PAGE_H
+#endif PINTOS_47_PAGE_H
