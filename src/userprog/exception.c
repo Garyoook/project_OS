@@ -219,6 +219,14 @@ page_fault (struct intr_frame *f)
       exit(-1);
     }
   } else {
+    // reclamation
+    if (spage1->evicted) {
+      void *f = frame_evict();
+      frame_reclaim(f);
+      return;
+    }
+
+
     uint32_t read_bytes = spage1->read_bytes;
     uint32_t zero_bytes = spage1->zero_bytes;
     uint8_t *upage = spage1->upage;

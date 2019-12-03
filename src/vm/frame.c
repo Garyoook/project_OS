@@ -25,7 +25,7 @@ void frame_delete(struct frame* frame1){
   free(frame1);
 }
 
-void frame_evict() {
+void* frame_evict() {
   struct frame *f = list_entry(list_begin(&frame_table), struct frame, f_elem);
   f->page = NULL;
   pagedir_clear_page(f->t->pagedir, f->page);
@@ -35,7 +35,17 @@ void frame_evict() {
   evicted_page->evicted = true;
   block_index++;
   list_remove(&f->f_elem);
-  free(f);
+  return f;
+}
+
+void frame_reclaim(void *frame) {
+  struct frame *f = frame;
+  f->page = palloc_get_page(PAL_USER);
+  f->t = thread_current();
+  list_push_back(&frame_table, &f->f_elem);
+  struct spage *reclaimed_page = lookup_spage(f->page);
+  read_from_block(f, reclaimed_page->block_index);
+  reclaimed_page->evicted = false;
 }
 
 void frame_update() {

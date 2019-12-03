@@ -8,7 +8,3 @@ void read_from_block(void *frame, int index);
 void write_to_block(void *frame, int index);
 
 #endif //PINTOS_47_SWAP_H
-
-
-
-
