@@ -35,6 +35,7 @@ struct fileWithFd {
   bool reopened;
   void* addr;
   bool dirty;
+  bool mmaped;
 
   struct list_elem file_elem;
 };
@@ -310,6 +311,7 @@ open(const char *file) {
     fileFd->tid = cur->tid;
     fileFd->reopened = reopened;
     fileFd->dirty = false;
+    fileFd->mmaped = false;
     if (fileFd->reopened) {
       file_reopen(fileFd->f);
     }
@@ -390,6 +392,10 @@ write(int fd, const void *buffer, unsigned size) {
         if (!fileFd->reopened)
           file_allow_write(fileFd->f);
       }
+      if (fileFd->mmaped) {
+        file_seek(fileFd->f, 0);
+      }
+
       int result = file_write(fileFd->f, buffer, size);
       file_deny_write(fileFd->f);
       fileFd->dirty = true;
@@ -436,6 +442,12 @@ close(int fd) {
     if (fileFd->fd == fd ) {
       if (fileFd->f == NULL || fileFd->tid != cur->tid) {
         return;
+      }
+      if (fileFd->mmaped && !lookup_spage(fileFd->addr)->has_load_in){
+        bool load_file_in = *lookup_spage(fileFd->addr)->upage;
+        if (load_file_in) {
+          printf("");
+        }
       }
       file_close(fileFd->f);
       list_remove(e);
@@ -491,6 +503,7 @@ mapid_t mmap(int fd, void *addr) {
     e = e->next;
     if (fd == fileFd->fd){
       fileFd->addr = addr;
+      fileFd->mmaped = true;
       uint32_t zero_set = ((uint32_t)file_size) % PGSIZE;
       create_spage(fileFd->f, file_tell(fileFd->f), addr, (uint32_t) file_length(fileFd->f), PGSIZE - zero_set, true);
       return fd;
@@ -515,6 +528,16 @@ void munmap(mapid_t mapping) {
 
         if (fileFd->addr == NULL)
           return;
+        if (fileFd->mmaped && lookup_spage(fileFd->addr)->has_load_in == false) {
+          bool load_file_in = *lookup_spage(fileFd->addr)->upage;
+          if (load_file_in) {
+            printf("");
+          }
+
+        }
+
+
+        fileFd->mmaped = false;
 
         if (!fileFd->reopened)
           file_allow_write(fileFd->f);

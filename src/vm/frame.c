@@ -9,13 +9,20 @@
 #include "vm/swap.h"
 
 void frame_delete(struct frame* f);
+int ctr = 0;
 
 void* frame_create(enum palloc_flags flags, struct thread *thread) {
   struct frame *f = malloc(sizeof(struct frame));
+//  printf("creating frame...%d\n", ctr);
+  ctr++;
   if (f == NULL) {
     return f;
   }
   f->page         = palloc_get_page(flags);
+  if (f->page == NULL) {
+//    printf("frame has been used up!!\n");
+    return NULL;
+  }
   f->t            = thread;
   list_push_back(&frame_table, &f->f_elem);
   return f->page;
@@ -53,6 +60,7 @@ void frame_evict(void *kpage) {
   struct spage *sp = lookup_spage(frame_to_evict->page);
   pagedir_clear_page(thread_current()->pagedir, frame_to_evict->page);
   list_remove(&frame_to_evict->f_elem);
+  sp->kpage = NULL;
   sp->evicted = true;
   swap_index++;
   sp->reclaim_index = 0;

@@ -35,8 +35,9 @@
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
-static void kill (struct intr_frame *);
-static void page_fault (struct intr_frame *);
+static void kill(struct intr_frame *);
+
+static void page_fault(struct intr_frame *);
 
 /* Registers handlers for interrupts that can be caused by user
    programs.
@@ -54,50 +55,47 @@ static void page_fault (struct intr_frame *);
    Refer to [IA32-v3a] section 5.15 "Exception and Interrupt
    Reference" for a description of each of these exceptions. */
 void
-exception_init (void)
-{
+exception_init(void) {
   /* These exceptions can be raised explicitly by a user program,
      e.g. via the INT, INT3, INTO, and BOUND instructions.  Thus,
      we set DPL==3, meaning that user programs are allowed to
      invoke them via these instructions. */
-  intr_register_int (3, 3, INTR_ON, kill, "#BP Breakpoint Exception");
-  intr_register_int (4, 3, INTR_ON, kill, "#OF Overflow Exception");
-  intr_register_int (5, 3, INTR_ON, kill,
-                     "#BR BOUND Range Exceeded Exception");
+  intr_register_int(3, 3, INTR_ON, kill, "#BP Breakpoint Exception");
+  intr_register_int(4, 3, INTR_ON, kill, "#OF Overflow Exception");
+  intr_register_int(5, 3, INTR_ON, kill,
+                    "#BR BOUND Range Exceeded Exception");
 
   /* These exceptions have DPL==0, preventing user processes from
      invoking them via the INT instruction.  They can still be
      caused indirectly, e.g. #DE can be caused by dividing by
      0.  */
-  intr_register_int (0, 0, INTR_ON, kill, "#DE Divide Error");
-  intr_register_int (1, 0, INTR_ON, kill, "#DB Debug Exception");
-  intr_register_int (6, 0, INTR_ON, kill, "#UD Invalid Opcode Exception");
-  intr_register_int (7, 0, INTR_ON, kill,
-                     "#NM Device Not Available Exception");
-  intr_register_int (11, 0, INTR_ON, kill, "#NP Segment Not Present");
-  intr_register_int (12, 0, INTR_ON, kill, "#SS Stack Fault Exception");
-  intr_register_int (13, 0, INTR_ON, kill, "#GP General Protection Exception");
-  intr_register_int (16, 0, INTR_ON, kill, "#MF x87 FPU Floating-Point Error");
-  intr_register_int (19, 0, INTR_ON, kill,
-                     "#XF SIMD Floating-Point Exception");
+  intr_register_int(0, 0, INTR_ON, kill, "#DE Divide Error");
+  intr_register_int(1, 0, INTR_ON, kill, "#DB Debug Exception");
+  intr_register_int(6, 0, INTR_ON, kill, "#UD Invalid Opcode Exception");
+  intr_register_int(7, 0, INTR_ON, kill,
+                    "#NM Device Not Available Exception");
+  intr_register_int(11, 0, INTR_ON, kill, "#NP Segment Not Present");
+  intr_register_int(12, 0, INTR_ON, kill, "#SS Stack Fault Exception");
+  intr_register_int(13, 0, INTR_ON, kill, "#GP General Protection Exception");
+  intr_register_int(16, 0, INTR_ON, kill, "#MF x87 FPU Floating-Point Error");
+  intr_register_int(19, 0, INTR_ON, kill,
+                    "#XF SIMD Floating-Point Exception");
 
   /* Most exceptions can be handled with interrupts turned on.
      We need to disable interrupts for page faults because the
      fault address is stored in CR2 and needs to be preserved. */
-  intr_register_int (14, 0, INTR_OFF, page_fault, "#PF Page-Fault Exception");
+  intr_register_int(14, 0, INTR_OFF, page_fault, "#PF Page-Fault Exception");
 }
 
 /* Prints exception statistics. */
 void
-exception_print_stats (void)
-{
-  printf ("Exception: %lld page faults\n", page_fault_cnt);
+exception_print_stats(void) {
+  printf("Exception: %lld page faults\n", page_fault_cnt);
 }
 
 /* Handler for an exception (probably) caused by a user process. */
 static void
-kill (struct intr_frame *f)
-{
+kill(struct intr_frame *f) {
   /* This interrupt is one (probably) caused by a user process.
      For example, the process might have tried to access unmapped
      virtual memory (a page fault).  For now, we simply kill the
@@ -108,31 +106,30 @@ kill (struct intr_frame *f)
 
   /* The interrupt frame's code segment value tells us where the
      exception originated. */
-  switch (f->cs)
-    {
+  switch (f->cs) {
     case SEL_UCSEG:
       /* User's code segment, so it's a user exception, as we
          expected.  Kill the user process.  */
-      printf ("%s: dying due to interrupt %#04x (%s).\n",
-              thread_name (), f->vec_no, intr_name (f->vec_no));
-      intr_dump_frame (f);
-      thread_exit ();
+      printf("%s: dying due to interrupt %#04x (%s).\n",
+             thread_name(), f->vec_no, intr_name(f->vec_no));
+      intr_dump_frame(f);
+      thread_exit();
 
     case SEL_KCSEG:
       /* Kernel's code segment, which indicates a kernel bug.
          Kernel code shouldn't throw exceptions.  (Page faults
          may cause kernel exceptions--but they shouldn't arrive
          here.)  Panic the kernel to make the point.  */
-      intr_dump_frame (f);
+      intr_dump_frame(f);
       PANIC ("Kernel bug - unexpected interrupt in kernel");
 
     default:
       /* Some other code segment?  Shouldn't happen.  Panic the
          kernel. */
-      printf ("Interrupt %#04x (%s) in unknown segment %04x\n",
-             f->vec_no, intr_name (f->vec_no), f->cs);
-      thread_exit ();
-    }
+      printf("Interrupt %#04x (%s) in unknown segment %04x\n",
+             f->vec_no, intr_name(f->vec_no), f->cs);
+      thread_exit();
+  }
 }
 
 /* Page fault handler.  This is a skeleton that must be filled in
@@ -147,19 +144,17 @@ kill (struct intr_frame *f)
    description of "Interrupt 14--Page Fault Exception (#PF)" in
    [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
 bool
-install_page (void *upage, void *kpage, bool writable)
-{
-  struct thread *t = thread_current ();
+install_page(void *upage, void *kpage, bool writable) {
+  struct thread *t = thread_current();
 
   /* Verify that there's not already a page at that virtual
      address, then map our page there. */
-  return (pagedir_get_page (t->pagedir, upage) == NULL
-          && pagedir_set_page (t->pagedir, upage, kpage, writable));
+  return (pagedir_get_page(t->pagedir, upage) == NULL
+          && pagedir_set_page(t->pagedir, upage, kpage, writable));
 }
 
 static void
-page_fault (struct intr_frame *f)
-{
+page_fault(struct intr_frame *f) {
   bool not_present;  /* True: not-present page, false: writing r/o page. */
   bool write;        /* True: access was write, false: access was read. */
   bool user;         /* True: access by user, false: access by kernel. */
@@ -176,7 +171,7 @@ page_fault (struct intr_frame *f)
 
   /* Turn interrupts back on (they were only off so that we could
      be assured of reading CR2 before it changed). */
-  intr_enable ();
+  intr_enable();
   /* Count page faults. */
   page_fault_cnt++;
   /* Determine cause. */
@@ -191,30 +186,30 @@ page_fault (struct intr_frame *f)
   }
 
   uint8_t *upage = pg_round_down(fault_addr);
-  struct spage* sup_page =  lookup_spage(upage);
+  struct spage *sup_page = lookup_spage(upage);
 
   if (sup_page == NULL) {
     if (fault_addr >= f->esp - 32) {
-    uint8_t *kpage;
-    bool success = false;
-    kpage = frame_create(PAL_USER, thread_current());
+      uint8_t *kpage;
+      bool success = false;
+      kpage = frame_create(PAL_USER, thread_current());
       if (kpage != NULL) {
-       if (num > 2048) {
-         exit(-1);
-       }
-       success = install_page (((uint8_t *) PHYS_BASE) - num * PGSIZE, kpage, true);
-       if (success){
+        if (num > 2048) {
+          exit(-1);
+        }
+        success = install_page(((uint8_t *) PHYS_BASE) - num * PGSIZE, kpage, true);
+        if (success) {
 //        f->esp = PHYS_BASE - 2 * PGSIZE;
-        num++;
-        thread_current()->stack = PHYS_BASE - PGSIZE;
+          num++;
+          thread_current()->stack = PHYS_BASE - PGSIZE;
         } else {
-        palloc_free_page(kpage);
-        exit(-1);
-       }
-    } else {
+          palloc_free_page(kpage);
+          exit(-1);
+        }
+      } else {
         frame_evict(kpage);
       }
-    return;
+      return;
     } else {
       exit(-1);
     }
@@ -225,7 +220,7 @@ page_fault (struct intr_frame *f)
     off_t ofs = sup_page->offset;
     bool writable = sup_page->writable;
     if (not_present) {
-      file_seek(sup_page->file1, ofs);
+      file_seek(sup_page->file_sp, ofs);
       while (read_bytes > 0 || zero_bytes > 0) {
         /* Calculate how to fill this page.
            We will read PAGE_READ_BYTES bytes from FILE
@@ -235,12 +230,13 @@ page_fault (struct intr_frame *f)
 
         uint8_t *kpage = frame_create(PAL_USER, thread_current());
         sup_page->kpage = kpage;
+        sup_page->has_load_in = true;
 
         if (kpage == NULL)
           exit(-1);
 
         /* Load this page. */
-        if (file_read(sup_page->file1, kpage, page_read_bytes) != (int) page_read_bytes) {
+        if (file_read(sup_page->file_sp, kpage, page_read_bytes) != (int) page_read_bytes) {
           palloc_free_page(kpage);
           exit(-1);
         }
@@ -271,11 +267,11 @@ page_fault (struct intr_frame *f)
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
-          fault_addr,
-          not_present ? "not present" : "rights violation",
-          write ? "writing" : "reading",
-          user ? "user" : "kernel");
-  kill (f);
+  printf("Page fault at %p: %s error %s page in %s context.\n",
+         fault_addr,
+         not_present ? "not present" : "rights violation",
+         write ? "writing" : "reading",
+         user ? "user" : "kernel");
+  kill(f);
 }
 
