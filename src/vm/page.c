@@ -42,7 +42,7 @@ bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
   new_page->read_bytes = read_bytes;
   new_page->zero_bytes = zero_bytes;
   new_page->writable = writable;
-  new_page->for_lazy_load = true;
+  new_page->has_load_in = false;
   hash_insert(&thread_current()->spage_table, &new_page->pelem);
  // printf("W%d\n", file_tell(file));
 
@@ -69,13 +69,8 @@ bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
       }
     }
   }
-
-  bool something = *upage;
   file_seek(file, 0);
-//  printf("W%d\n", file_tell(file));
-//  *upage;
-//  printf("PPPPPPPPPPPPPPPPPage addr remembered: %u\n", (uint32_t) *upage);
-  return (bool) something;
+  return true;
 }
 
 struct spage * lookup_spage(uint8_t* upage) {

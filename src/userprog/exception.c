@@ -233,6 +233,7 @@ page_fault (struct intr_frame *f)
 
         uint8_t *kpage = frame_create(PAL_USER, thread_current());
         spage1->kpage = kpage;
+        spage1->has_load_in = true;
 
         if (kpage == NULL)
           exit(-1);
