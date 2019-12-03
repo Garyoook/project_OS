@@ -6,6 +6,7 @@
 #include <string.h>
 #include <kernel/hash.h>
 #include <vm/page.h>
+#include <vm/swap.h>
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
@@ -208,7 +209,7 @@ start_process (void *file_name_)
   // take the executable name and pass it to load();
   char *command_name, *save_ptr;
   command_name = strtok_r((char *) s, " ", &save_ptr);
-
+  init_swap_block();
   success = load (command_name, &if_.eip, &if_.esp);
 
   cur->parent->load_success = success;

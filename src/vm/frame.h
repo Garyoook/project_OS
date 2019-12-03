@@ -18,5 +18,6 @@ struct frame{
 
 struct list frame_table;
 void* frame_create(enum palloc_flags flags, struct thread *thread1);
+void frame_evict(enum palloc_flags flags, struct thread *thread1);
 
 #endif //PINTOS_47_FRAME_H

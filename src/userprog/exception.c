@@ -160,6 +160,7 @@ install_page (void *upage, void *kpage, bool writable)
 static void
 page_fault (struct intr_frame *f) 
 {
+
   bool not_present;  /* True: not-present page, false: writing r/o page. */
   bool write;        /* True: access was write, false: access was read. */
   bool user;         /* True: access by user, false: access by kernel. */
@@ -184,13 +185,14 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-
-  if (!is_user_vaddr(fault_addr) || fault_addr == NULL || fault_addr >= PHYS_BASE
-      || fault_addr < (void *) 0x08048000) {
-    exit(-1);
-  }
+//
+//  if (!is_user_vaddr(fault_addr) || fault_addr == NULL || fault_addr >= PHYS_BASE
+//      || fault_addr < (void *) 0x08048000) {
+//    exit(-1);
+//  }
 
   uint8_t *upage = pg_round_down(fault_addr);
+
   struct spage* spage1 =  lookup_spage(upage);
 
   if (spage1 == NULL) {
@@ -198,7 +200,6 @@ page_fault (struct intr_frame *f)
     uint8_t *kpage;
     bool success = false;
     kpage = frame_create(PAL_USER, thread_current());
-
     if (kpage != NULL)
     {
       if (num > 2048) exit(-1);
@@ -217,6 +218,7 @@ page_fault (struct intr_frame *f)
       exit(-1);
     }
   } else {
+//    PANIC("DD");
     uint32_t read_bytes = spage1->read_bytes;
     uint32_t zero_bytes = spage1->zero_bytes;
     uint8_t *upage = spage1->upage;

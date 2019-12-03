@@ -13,7 +13,6 @@
 #include "list.h"
 #include "threads/palloc.h"
 
-#include "page.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -31,6 +30,9 @@ struct spage{
   bool writable;
   struct hash_elem pelem;
   bool has_load_in;
+  bool in_swap_table;
+  size_t position_in_swap;
+
 };
 
 unsigned
