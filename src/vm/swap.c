@@ -23,20 +23,25 @@ void write_to_block(void* frame, int index) {
   }
 }
 
-void to_swap(void *kpage) {
-  size_t index = bitmap_scan_and_flip(swap_bmap, 0, 1, true);
-  if (index == BITMAP_ERROR) {
-    return;
+bool write_to_swap(void *kpage) {
+  size_t start = bitmap_scan_and_flip(swap_bmap, 0, 1, true);
+  if (start == BITMAP_ERROR) {
+    return false;
   }
-  block_sector_t ofs = index * (PGSIZE/BLOCK_SECTOR_SIZE);
+  block_sector_t ofs = (block_sector_t) (start * (PGSIZE / BLOCK_SECTOR_SIZE));
   write_to_block(kpage, ofs);
+  swap_index = ofs;
+  return true;
 }
 
-void from_swap(void *kpage) {
-  size_t index = bitmap_scan_and_flip(swap_bmap, (tbd), (tbd), true);
+bool read_from_swap(void *kpage, size_t index) {
+  bitmap_scan_and_flip(swap_bmap, index, 1, true);
   if (index == BITMAP_ERROR) {
-    return;
+    return false;
   }
-  block_sector_t ofs = index * (PGSIZE/BLOCK_SECTOR_SIZE);
+  block_sector_t ofs = (block_sector_t) (index * (PGSIZE / BLOCK_SECTOR_SIZE));
   read_from_block(kpage, ofs);
+  bitmap_set(swap_bmap, index, true);
+
+  return true;
 }

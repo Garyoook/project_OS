@@ -31,6 +31,7 @@
 #include "threads/vaddr.h"
 #include "syscall.h"
 #include "vm/frame.h"
+#include "vm/swap.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -214,6 +215,12 @@ page_fault(struct intr_frame *f) {
       exit(-1);
     }
   } else {
+    /* reclamation here:*/
+    if (sup_page->evicted) {
+      read_from_swap(upage, (size_t) swap_index);
+    }
+
+    /* stack growing */
     uint32_t read_bytes = sup_page->read_bytes;
     uint32_t zero_bytes = sup_page->zero_bytes;
     uint8_t *sup_upage = sup_page->upage;

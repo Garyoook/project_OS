@@ -58,6 +58,7 @@ void frame_evict(void *kpage) {
 
 //  struct frame *frame_to_evict = lookup_frame(kpage);
   struct spage *sp = lookup_spage(frame_to_evict->page);
+  write_to_swap(kpage);
   pagedir_clear_page(thread_current()->pagedir, frame_to_evict->page);
   list_remove(&frame_to_evict->f_elem);
   sp->kpage = NULL;
