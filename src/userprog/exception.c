@@ -146,16 +146,16 @@ kill (struct intr_frame *f)
    can find more information about both of these in the
    description of "Interrupt 14--Page Fault Exception (#PF)" in
    [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
-bool
-install_page (void *upage, void *kpage, bool writable)
-{
-  struct thread *t = thread_current ();
-
-  /* Verify that there's not already a page at that virtual
-     address, then map our page there. */
-  return (pagedir_get_page (t->pagedir, upage) == NULL
-          && pagedir_set_page (t->pagedir, upage, kpage, writable));
-}
+//bool
+//install_page (void *upage, void *kpage, bool writable)
+//{
+//  struct thread *t = thread_current ();
+//
+//  /* Verify that there's not already a page at that virtual
+//     address, then map our page there. */
+//  return (pagedir_get_page (t->pagedir, upage) == NULL
+//          && pagedir_set_page (t->pagedir, upage, kpage, writable));
+//}
 
 static void
 page_fault (struct intr_frame *f) 

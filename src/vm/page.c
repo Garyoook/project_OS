@@ -46,7 +46,7 @@ bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
   hash_insert(&thread_current()->spage_table, &new_page->pelem);
  // printf("W%d\n", file_tell(file));
 
-
+//sharing
   if (!writable) {
     struct hash_iterator i;
     struct thread *t = thread_current();

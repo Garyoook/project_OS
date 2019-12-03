@@ -481,7 +481,6 @@ mapid_t mmap(int fd, void *addr) {
     }
   }
 
-
   struct thread *cur = thread_current();
   struct list_elem *e = list_begin(&cur->file_fd_list);
   while (e != list_end(&cur->file_fd_list)) {
@@ -491,12 +490,11 @@ mapid_t mmap(int fd, void *addr) {
       fileFd->addr = addr;
       uint32_t zero_set = ((uint32_t)file_size) % PGSIZE;
       create_spage(fileFd->f, file_tell(fileFd->f), addr, (uint32_t) file_length(fileFd->f), PGSIZE - zero_set, true);
+      struct spage *spage = lookup_spage(addr);
+      spage->md = fd;
       return fd;
     }
   }
-
-
-
   return -1;
 }
 
