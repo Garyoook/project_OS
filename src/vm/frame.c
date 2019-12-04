@@ -15,11 +15,8 @@ void* frame_create(enum palloc_flags flags, struct thread *thread1) {
   struct frame *f = malloc(sizeof(struct frame));
   f->page         = palloc_get_page(flags);
   if (f->page == NULL) {
-    if (eviction()) {
-      f->page = palloc_get_page(flags);
-    } else {
-      exit(-1);
-    }
+    eviction();
+    f->page = palloc_get_page(flags);printf("Q%d\n", f->page);
   }
   f->t            = thread1;
   list_push_back(&frame_table, &f->f_elem);
@@ -39,6 +36,8 @@ bool eviction() {
   //eviction policy
   struct list_elem *ef = list_pop_front(&frame_table);
   struct frame *evict_frame = list_entry(ef, struct frame, f_elem);
+  palloc_free_page(evict_frame->page);
+  write_to_swap(evict_frame);
 
   struct hash_iterator i;
   hash_first(&i, &thread_current()->spage_table);
@@ -46,21 +45,14 @@ bool eviction() {
   //Remove references to the frame from any page table that refers to it
   while (hash_next(&i)) {
     struct spage *sp = hash_entry (hash_cur(&i), struct spage, pelem);
-    if (sp == NULL)
+    if (sp == NULL) {
       break;
-    if (sp->kpage == evict_frame->page) {
-      pagedir_clear_page(thread_current()->pagedir, sp->upage);
-      sp->kpage = NULL;
+    }
 
-      if (sp->file1 == NULL) {
-        struct swap_entry *swap = swap_create(evict_frame->page, evict_frame->t, evict_frame->frame);
-        if (swap == NULL) {
-          exit(-1);
-        }
-      } else {
-        munmap(sp->md);
-      }
-      return true;
+    if (sp->kpage == evict_frame->page) {
+      sp->in_swap_table = true;
+      pagedir_clear_page(thread_current()->pagedir, sp->upage);
+     return true;
     }
   }
   return false;

@@ -184,7 +184,7 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-
+//  printf("1\n");
   if (!is_user_vaddr(fault_addr) || fault_addr == NULL || fault_addr >= PHYS_BASE
       || fault_addr < (void *) 0x08048000) {
     exit(-1);
@@ -193,17 +193,22 @@ page_fault (struct intr_frame *f)
   uint8_t *upage = pg_round_down(fault_addr);
   struct spage* spage1 =  lookup_spage(upage);
 
+//  if (spage1->in_swap_table == true) {
+//
+//  }
+
   if (spage1 == NULL) {
     if (fault_addr >= f->esp - 32) {
     uint8_t *kpage;
     bool success = false;
     kpage = frame_create(PAL_USER, thread_current());
-
     if (kpage != NULL)
     {
       if (num > 2048) exit(-1);
       success = install_page (((uint8_t *) PHYS_BASE) - num * PGSIZE, kpage, true);
       if (success){
+        struct spage *s = create_spage(NULL, 0, ((uint8_t *) PHYS_BASE) - num * PGSIZE, 0, 0, false);
+        s->kpage = kpage;
 //        f->esp = PHYS_BASE - 2 * PGSIZE;
         num++;
         thread_current()->stack = PHYS_BASE - PGSIZE;
@@ -217,6 +222,7 @@ page_fault (struct intr_frame *f)
       exit(-1);
     }
   } else {
+//    PANIC("DD");
     uint32_t read_bytes = spage1->read_bytes;
     uint32_t zero_bytes = spage1->zero_bytes;
     uint8_t *upage = spage1->upage;
@@ -233,6 +239,7 @@ page_fault (struct intr_frame *f)
 
         uint8_t *kpage = frame_create(PAL_USER, thread_current());
         spage1->kpage = kpage;
+        spage1->has_load_in = true;
 
         if (kpage == NULL)
           exit(-1);
@@ -249,7 +256,6 @@ page_fault (struct intr_frame *f)
           palloc_free_page(kpage);
           exit(-1);
         }
-
         /* Advance. */
         read_bytes -= page_read_bytes;
         zero_bytes -= page_zero_bytes;

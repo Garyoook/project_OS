@@ -1,36 +1,53 @@
-#include "threads/malloc.h"
+#include "userprog/pagedir.h"
+#include "threads/thread.h"
+#include "kernel/list.h"
+#include "kernel/bitmap.h"
 #include "swap.h"
 #include "devices/block.h"
+#include "page.h"
+#include "frame.h"
 
+size_t get_free_slot(size_t size);
 
-unsigned
-swap_hash (const struct hash_elem *e, void *aux UNUSED) {
-  const struct swap_entry *s = hash_entry(e, struct swap_entry, swap_elem);
-  return hash_bytes(&s->upage, sizeof(s->upage));
+void init_swap_block(){
+  b = block_get_role(BLOCK_SWAP);
+  bmap = bitmap_create(block_size(b));
 }
 
-bool
-swap_less (const struct hash_elem *a, const struct hash_elem *b,
-           void *aux UNUSED)
-{
-  const struct swap_entry *s1 = hash_entry (a, struct swap_entry, swap_elem);
-  const struct swap_entry *s2 = hash_entry (b, struct swap_entry, swap_elem);
+void write_to_swap(struct frame *f){
+  struct swap *s;
+  s = malloc(sizeof(struct swap));
+  if (s == NULL) PANIC("swap fail");
+  size_t start = get_free_slot(sizeof(s));
+  s->position = start;
+  s->frame1 = f;
+  list_push_back(&swap_table, &s->s_elem);
 
-  return s1->upage < s2->upage;
+  bitmap_set_multiple(bmap, start, sizeof(s), 1);
+  block_write(b, (block_sector_t) start, s);
 }
 
-struct swap_entry* swap_create(uint8_t *upage, struct thread *t, void *frame) {
-  struct swap_entry *new_swap = malloc(sizeof(struct swap_entry));
-  if (new_swap != NULL) {
-    new_swap->upage = upage;
-    new_swap->t = t;
-    new_swap->frame = frame;
-    new_swap->block1 =
-    hash_insert(&swap_table, &new_swap->swap_elem);
-    return new_swap;
+void read_from_swap(struct frame* f) {
+  struct hash_iterator i;
+  hash_first(&i, &thread_current()->spage_table);
+
+  //Remove references to the frame from any page table that refers to it
+  while (hash_next(&i)) {
+    struct spage *sp = hash_entry (hash_cur(&i), struct spage, pelem);
+    if (sp == NULL)
+      break;
+    if (sp->kpage == f->page) {
+      if (!sp->in_swap_table)
+        PANIC("Q");
+      size_t start = sp->position_in_swap;
+      block_read(b, (block_sector_t) start, f);
+    }
   }
-  return NULL;
 }
-//struct block *swap_create() {
-//  swap_table = block_get_role(BLOCK_SWAP);
-//}
+
+
+
+size_t get_free_slot(size_t size){
+  return bitmap_scan(bmap, 0, size, 0);
+}
+
