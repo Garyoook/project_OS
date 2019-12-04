@@ -5,12 +5,15 @@
 #include <debug.h>
 #include "lib/kernel/hash.h"
 
+//struct block *swap_table;
+
 struct swap_entry {
     struct file *file1;
     struct thread *t;
     uint8_t *upage;
     uint8_t *kpage;
     uint8_t *frame;
+    struct block *block1;
     struct hash_elem swap_elem;
 };
 

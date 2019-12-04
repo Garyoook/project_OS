@@ -6,6 +6,7 @@
 #include <string.h>
 #include <kernel/hash.h>
 #include <vm/page.h>
+#include "vm/swap.h"
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
@@ -195,6 +196,8 @@ start_process (void *file_name_)
   struct thread *cur = thread_current();
   bool success;
   hash_init(&cur->spage_table , &page_hash, &page_less, NULL);
+ //   swap_table = malloc(sizeof(struct hash));
+  hash_init(&swap_table, &swap_hash, &swap_less, NULL);
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;

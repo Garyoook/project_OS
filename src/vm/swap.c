@@ -25,8 +25,12 @@ struct swap_entry* swap_create(uint8_t *upage, struct thread *t, void *frame) {
     new_swap->upage = upage;
     new_swap->t = t;
     new_swap->frame = frame;
+    new_swap->block1 =
     hash_insert(&swap_table, &new_swap->swap_elem);
     return new_swap;
   }
   return NULL;
 }
+//struct block *swap_create() {
+//  swap_table = block_get_role(BLOCK_SWAP);
+//}
