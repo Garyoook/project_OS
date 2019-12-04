@@ -3,7 +3,6 @@
 #include "kernel/bitmap.h"
 #include "threads/vaddr.h"
 
-static struct block *swap_block;
 
 void swap_init() {
   swap_index = 0;

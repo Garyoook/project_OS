@@ -19,6 +19,7 @@
 #include "threads/vaddr.h"
 #include "syscall.h"
 #include "vm/frame.h"
+#include "vm/swap.h"
 
 // a macro to reduce duplicated code in arguments passing;
 #define \
@@ -195,6 +196,7 @@ start_process (void *file_name_)
   struct thread *cur = thread_current();
   bool success;
   hash_init(&cur->spage_table , &page_hash, &page_less, NULL);
+  swap_init();
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;

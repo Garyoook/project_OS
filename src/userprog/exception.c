@@ -150,8 +150,14 @@ install_page(void *upage, void *kpage, bool writable) {
 
   /* Verify that there's not already a page at that virtual
      address, then map our page there. */
-  return (pagedir_get_page(t->pagedir, upage) == NULL
-          && pagedir_set_page(t->pagedir, upage, kpage, writable));
+  if (pagedir_get_page(t->pagedir, upage) == NULL
+          && pagedir_set_page(t->pagedir, upage, kpage, writable)) {
+    struct frame *f = lookup_frame(kpage);
+    f->upage = upage;
+    return true;
+  } else {
+    return false;
+  }
 }
 
 static void
@@ -207,9 +213,11 @@ page_fault(struct intr_frame *f) {
           palloc_free_page(kpage);
           exit(-1);
         }
-      } else {
-        frame_evict(kpage);
       }
+//      else {
+//        printf("Now evict: \n");
+//        frame_evict(kpage);
+//      }
       return;
     } else {
       exit(-1);

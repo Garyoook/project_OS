@@ -7,29 +7,30 @@
 #include "page.h"
 #include "userprog/pagedir.h"
 #include "vm/swap.h"
+#include "threads/vaddr.h"
 
 void frame_delete(struct frame* f);
 int ctr = 0;
 
 void* frame_create(enum palloc_flags flags, struct thread *thread) {
   struct frame *f = malloc(sizeof(struct frame));
-//  printf("creating frame...%d\n", ctr);
   ctr++;
   if (f == NULL) {
     return f;
   }
-  f->page         = palloc_get_page(flags);
-  if (f->page == NULL) {
-//    printf("frame has been used up!!\n");
+  f->kpage         = palloc_get_page(flags);
+  if (f->kpage == NULL) {
+    printf("frame has been used up!!\n");
+    frame_evict();
     return NULL;
   }
   f->t            = thread;
   list_push_back(&frame_table, &f->f_elem);
-  return f->page;
+  return f->kpage;
 }
 
 void frame_delete(struct frame* f){
-  palloc_free_page(f->page);
+  palloc_free_page(f->kpage);
   list_remove(&f->f_elem);
   free(f);
 }
@@ -44,7 +45,7 @@ struct frame * lookup_frame(void *frame) {
     if (f == NULL) {
       return NULL;
     }
-    if (f->page == frame) {
+    if (f->kpage == frame) {
       return f;
     }
     e = e->next;
@@ -52,19 +53,21 @@ struct frame * lookup_frame(void *frame) {
   return NULL;
 }
 
-void frame_evict(void *kpage) {
-  struct list_elem *e = list_pop_front(&frame_table);
+void frame_evict() {
+  printf("%zu\n", list_size(&frame_table));
+  struct list_elem *e = list_head(&frame_table);
+  ASSERT(e != NULL);
   struct frame * frame_to_evict = list_entry(e, struct frame, f_elem);
-
-//  struct frame *frame_to_evict = lookup_frame(kpage);
-  struct spage *sp = lookup_spage(frame_to_evict->page);
+  void *kpage = frame_to_evict->kpage;
+  struct spage *sp = lookup_spage(frame_to_evict->upage);
   write_to_swap(kpage);
-  pagedir_clear_page(thread_current()->pagedir, frame_to_evict->page);
-  list_remove(&frame_to_evict->f_elem);
+//  printf("PPPPPPPPPPPPPPPPPPPPPPPPPPPP   %p\n", frame_to_evict->kpage);
+  pagedir_clear_page(thread_current()->pagedir, frame_to_evict->upage);
+  list_pop_front(&frame_table);
   sp->kpage = NULL;
   sp->evicted = true;
   swap_index++;
-  sp->reclaim_index = 0;
+  sp->reclaim_index = swap_index;
 }
 
 

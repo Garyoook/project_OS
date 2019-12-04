@@ -10,15 +10,15 @@
 
 
 struct frame{
-  void* frame;
-  void* page;
+  void* upage;
+  void* kpage;
   struct thread* t;
   struct list_elem f_elem;
 };
 
 struct list frame_table;
 void* frame_create(enum palloc_flags flags, struct thread *thread);
-void frame_evict(void *kpage);
+void frame_evict(void);
 struct frame * lookup_frame(void *frame);
 
 #endif //PINTOS_47_FRAME_H
