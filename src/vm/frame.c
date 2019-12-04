@@ -12,7 +12,7 @@
 void frame_delete(struct frame* f);
 int ctr = 0;
 
-void* frame_create(enum palloc_flags flags, struct thread *thread) {
+void* frame_create(enum palloc_flags flags, struct thread *thread, void *upage) {
   struct frame *f = malloc(sizeof(struct frame));
   ctr++;
   if (f == NULL) {
@@ -25,6 +25,7 @@ void* frame_create(enum palloc_flags flags, struct thread *thread) {
     return NULL;
   }
   f->t            = thread;
+  f->upage        = upage;
   list_push_back(&frame_table, &f->f_elem);
   return f->kpage;
 }

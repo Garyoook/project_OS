@@ -150,14 +150,8 @@ install_page(void *upage, void *kpage, bool writable) {
 
   /* Verify that there's not already a page at that virtual
      address, then map our page there. */
-  if (pagedir_get_page(t->pagedir, upage) == NULL
-          && pagedir_set_page(t->pagedir, upage, kpage, writable)) {
-    struct frame *f = lookup_frame(kpage);
-    f->upage = upage;
-    return true;
-  } else {
-    return false;
-  }
+  return  (pagedir_get_page(t->pagedir, upage) == NULL
+          && pagedir_set_page(t->pagedir, upage, kpage, writable)) ;
 }
 
 static void
@@ -199,7 +193,7 @@ page_fault(struct intr_frame *f) {
     if (fault_addr >= f->esp - 32) {
       uint8_t *kpage;
       bool success = false;
-      kpage = frame_create(PAL_USER, thread_current());
+      kpage = frame_create(PAL_USER, thread_current(), upage);
       if (kpage != NULL) {
         if (num > 2048) {
           exit(-1);
@@ -244,7 +238,7 @@ page_fault(struct intr_frame *f) {
         size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
         size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-        uint8_t *kpage = frame_create(PAL_USER, thread_current());
+        uint8_t *kpage = frame_create(PAL_USER, thread_current(), sup_upage);
         sup_page->kpage = kpage;
         sup_page->has_load_in = true;
 
