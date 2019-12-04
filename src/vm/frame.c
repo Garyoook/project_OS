@@ -1,17 +1,18 @@
+
 #include "threads/malloc.h"
 #include <debug.h>
 #include "threads/thread.h"
 #include <string.h>
-#include "userprog/pagedir.h"
 #include "frame.h"
-#include "swap.h"
 #include "page.h"
+#include "userprog/pagedir.h"
+#include "vm/swap.h"
+#include "threads/vaddr.h"
 
-void frame_delete(struct frame* frame1);
+void frame_delete(struct frame* f);
+int ctr = 0;
 
-int block_index = 0;
-
-void* frame_create(enum palloc_flags flags, struct thread *thread1) {
+void* frame_create(enum palloc_flags flags, struct thread *thread) {
   struct frame *f = malloc(sizeof(struct frame));
   ctr++;
   if (f == NULL) {
@@ -34,28 +35,40 @@ void frame_delete(struct frame* f){
   free(f);
 }
 
-void* frame_evict() {
-  struct frame *f = list_entry(list_begin(&frame_table), struct frame, f_elem);
-  f->page = NULL;
-  pagedir_clear_page(f->t->pagedir, f->page);
-  write_to_block(f->frame, block_index);
-  struct spage *evicted_page = lookup_spage(f->page);
-  evicted_page->block_index = block_index;
-  evicted_page->evicted = true;
-  block_index++;
-  list_remove(&f->f_elem);
-  return f;
-}
-
-void frame_reclaim(void *frame) {
-  struct frame *f = frame;
-  f->page = palloc_get_page(PAL_USER);
-  f->t = thread_current();
-  list_push_back(&frame_table, &f->f_elem);
-  struct spage *reclaimed_page = lookup_spage(f->page);
-  read_from_block(f, reclaimed_page->block_index);
-  reclaimed_page->evicted = false;
-}
-
 void frame_update() {
 }
+
+struct frame * lookup_frame(void *frame) {
+  struct list_elem *e = list_begin(&frame_table);
+  while (e != list_end(&frame_table)) {
+    struct frame * f = list_entry(e, struct frame, f_elem);
+    if (f == NULL) {
+      return NULL;
+    }
+    if (f->kpage == frame) {
+      return f;
+    }
+    e = e->next;
+  }
+  return NULL;
+}
+
+void frame_evict() {
+  printf("%zu\n", list_size(&frame_table));
+  struct list_elem *e = list_head(&frame_table);
+  ASSERT(e != NULL);
+  struct frame * frame_to_evict = list_entry(e, struct frame, f_elem);
+  void *kpage = frame_to_evict->kpage;
+  struct spage *sp = lookup_spage(frame_to_evict->upage);
+  write_to_swap(kpage);
+//  printf("PPPPPPPPPPPPPPPPPPPPPPPPPPPP   %p\n", frame_to_evict->kpage);
+  pagedir_clear_page(thread_current()->pagedir, frame_to_evict->upage);
+  list_pop_front(&frame_table);
+  sp->kpage = NULL;
+  sp->evicted = true;
+  swap_index++;
+  sp->reclaim_index = swap_index;
+}
+
+
+

@@ -2,7 +2,6 @@
 
 #include <string.h>
 #include <syscall.h>
-#include <stdio.h>
 #include "tests/vm/sample.inc"
 #include "tests/arc4.h"
 #include "tests/lib.h"
@@ -21,8 +20,8 @@ test_main (void)
 
   close (handle);
 
-  if (memcmp (ACTUAL, sample, strlen (sample))){
-    fail ("read of mmap'd file reported bad data");}
+  if (memcmp (ACTUAL, sample, strlen (sample)))
+    fail ("read of mmap'd file reported bad data");
 
   munmap (map);
 }

@@ -171,7 +171,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 
 pid_t
 exec(const char *cmd_line) {
-  if (!safe_access(cmd_line)) {
+  if (!safe_access(cmd_line)){
     return EXIT_FAIL;
   }
   pid_t pid = process_execute(cmd_line);

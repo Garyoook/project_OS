@@ -17,9 +17,8 @@ struct frame{
 };
 
 struct list frame_table;
-void* frame_create(enum palloc_flags flags, struct thread *thread1);
-void frame_delete(struct frame* frame);
-void *frame_evict();
-void frame_reclaim(void *frame);
+void* frame_create(enum palloc_flags flags, struct thread *thread);
+void frame_evict(void);
+struct frame * lookup_frame(void *frame);
 
 #endif //PINTOS_47_FRAME_H

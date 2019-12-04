@@ -43,9 +43,7 @@ bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
   new_page->read_bytes = read_bytes;
   new_page->zero_bytes = zero_bytes;
   new_page->writable = writable;
-  new_page->for_lazy_load = true;
-  new_page->block_index = -1;
-  new_page->evicted = false;
+  new_page->has_load_in = false;
   hash_insert(&thread_current()->spage_table, &new_page->pelem);
  // printf("W%d\n", file_tell(file));
 
