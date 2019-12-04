@@ -200,41 +200,40 @@ page_fault(struct intr_frame *f) {
       uint8_t *kpage;
       bool success = false;
       kpage = frame_create(PAL_USER, thread_current());
+
       if (kpage != NULL) {
-        if (num > 2048) {
-          exit(-1);
-        }
-        success = install_page(((uint8_t *) PHYS_BASE) - num * PGSIZE, kpage, true);
-        if (success) {
-//        f->esp = PHYS_BASE - 2 * PGSIZE;
+        // growth stack
+        if (num > 2048) exit(-1);
+        success = install_page (((uint8_t *) PHYS_BASE) - num * PGSIZE, kpage, true);
+        if (success){
           num++;
           thread_current()->stack = PHYS_BASE - PGSIZE;
         } else {
           palloc_free_page(kpage);
           exit(-1);
         }
+      } else {
+        // frame eviction
+        frame_evict();
       }
-//      else {
-//        printf("Now evict: \n");
-//        frame_evict(kpage);
-//      }
-      return;
+    return;
     } else {
       exit(-1);
     }
   } else {
-    /* reclamation here:*/
-    if (sup_page->evicted) {
-      printf("swap index : %d", swap_index);
-      read_from_swap(upage, (size_t) swap_index);
+    // reclamation
+    if (spage1->evicted) {
+      void *f = frame_evict();
+      frame_reclaim(f);
+      return;
     }
 
-    /* stack growing */
-    uint32_t read_bytes = sup_page->read_bytes;
-    uint32_t zero_bytes = sup_page->zero_bytes;
-    uint8_t *sup_upage = sup_page->upage;
-    off_t ofs = sup_page->offset;
-    bool writable = sup_page->writable;
+
+    uint32_t read_bytes = spage1->read_bytes;
+    uint32_t zero_bytes = spage1->zero_bytes;
+    uint8_t *upage = spage1->upage;
+    off_t ofs = spage1->offset;
+    bool writable = spage1->writable;
     if (not_present) {
       file_seek(sup_page->file_sp, ofs);
       while (read_bytes > 0 || zero_bytes > 0) {
