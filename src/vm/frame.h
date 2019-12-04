@@ -10,14 +10,14 @@
 
 
 struct frame{
-  void* upage;
   void* kpage;
+  void* upage;
   struct thread* t;
   struct list_elem f_elem;
 };
 
 struct list frame_table;
-void* frame_create(enum palloc_flags flags, struct thread *thread);
+void* frame_create(void *upage, enum palloc_flags flags, struct thread *thread, bool writable);
 void frame_evict(void);
 struct frame * lookup_frame(void *frame);
 

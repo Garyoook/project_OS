@@ -144,21 +144,15 @@ kill(struct intr_frame *f) {
    can find more information about both of these in the
    description of "Interrupt 14--Page Fault Exception (#PF)" in
    [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
-bool
-install_page(void *upage, void *kpage, bool writable) {
-  struct thread *t = thread_current();
-
-  /* Verify that there's not already a page at that virtual
-     address, then map our page there. */
-  if (pagedir_get_page(t->pagedir, upage) == NULL
-          && pagedir_set_page(t->pagedir, upage, kpage, writable)) {
-    struct frame *f = lookup_frame(kpage);
-    f->upage = upage;
-    return true;
-  } else {
-    return false;
-  }
-}
+//bool
+//install_page(void *upage, void *kpage, bool writable) {
+//  struct thread *t = thread_current();
+//
+//  /* Verify that there's not already a page at that virtual
+//     address, then map our page there. */
+//  return (pagedir_get_page(t->pagedir, upage) == NULL
+//          && pagedir_set_page(t->pagedir, upage, kpage, writable));
+//}
 
 static void
 page_fault(struct intr_frame *f) {
@@ -199,7 +193,7 @@ page_fault(struct intr_frame *f) {
     if (fault_addr >= f->esp - 32) {
       uint8_t *kpage;
       bool success = false;
-      kpage = frame_create(PAL_USER, thread_current());
+      kpage = frame_create(upage, PAL_USER, thread_current(), true);
       if (kpage != NULL) {
         if (num > 2048) {
           exit(-1);
@@ -244,7 +238,7 @@ page_fault(struct intr_frame *f) {
         size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
         size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-        uint8_t *kpage = frame_create(PAL_USER, thread_current());
+        uint8_t *kpage = frame_create(upage, PAL_USER, thread_current(), writable);
         sup_page->kpage = kpage;
         sup_page->has_load_in = true;
 
@@ -263,6 +257,7 @@ page_fault(struct intr_frame *f) {
           palloc_free_page(kpage);
           exit(-1);
         }
+
 
         /* Advance. */
         read_bytes -= page_read_bytes;
