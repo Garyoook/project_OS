@@ -28,20 +28,19 @@ bool write_to_swap(void *kpage) {
   if (start == BITMAP_ERROR) {
     return false;
   }
-  block_sector_t ofs = (block_sector_t) (start * (PGSIZE / BLOCK_SECTOR_SIZE));
-  write_to_block(kpage, ofs);
-  swap_index = ofs;
+  block_sector_t sector_no = (block_sector_t) (start * (PGSIZE / BLOCK_SECTOR_SIZE));
+  write_to_block(kpage, sector_no);
+  swap_index = sector_no;              // probably wrong.
   return true;
 }
 
-bool read_from_swap(void *kpage, size_t index) {
-  bitmap_scan_and_flip(swap_bmap, index, 1, true);
-  if (index == BITMAP_ERROR) {
+bool read_from_swap(void *kpage, size_t start) {
+  if (start == BITMAP_ERROR) {
     return false;
   }
-  block_sector_t ofs = (block_sector_t) (index * (PGSIZE / BLOCK_SECTOR_SIZE));
-  read_from_block(kpage, ofs);
-  bitmap_set(swap_bmap, index, true);
+  block_sector_t sector_no = (block_sector_t) (start * (PGSIZE / BLOCK_SECTOR_SIZE));
+  read_from_block(kpage, sector_no);
+  bitmap_set(swap_bmap, start, true);
 
   return true;
 }

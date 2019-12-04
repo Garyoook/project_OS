@@ -8,6 +8,7 @@
 #include "userprog/pagedir.h"
 #include "threads/thread.h"
 #include "threads/malloc.h"
+#include "threads/vaddr.h"
 
 
 
@@ -60,6 +61,7 @@ bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
         new_page->kpage = sp->kpage;
 
         if (new_page->kpage != NULL) {
+          printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAHH\n");
           bool install_page = (pagedir_get_page(t->pagedir, upage) == NULL
                                && pagedir_set_page(t->pagedir, upage, new_page->kpage, writable));
           if (!install_page)
