@@ -9,16 +9,16 @@
 struct swap {
     struct frame *frame1;
     size_t position;
-    struct spage *page;
+    struct spage *sp;
     struct list_elem s_elem;
 };
 
 struct list swap_table;
 struct block* b;
 struct bitmap* bmap;
-void write_to_swap(struct frame* something);
+struct swap *write_to_swap(struct frame* something);
 void init_swap_block();
-void read_from_swap(struct frame* something);
+void read_from_swap(uint8_t *addr, struct frame *frame);
 size_t get_free_slot(size_t size);
 
 #endif //PINTOS_47_SWAP_H

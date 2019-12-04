@@ -36,8 +36,8 @@ bool eviction() {
   //eviction policy
   struct list_elem *ef = list_pop_front(&frame_table);
   struct frame *evict_frame = list_entry(ef, struct frame, f_elem);
+  struct swap *s = write_to_swap(evict_frame);
   palloc_free_page(evict_frame->page);
-  write_to_swap(evict_frame);
 
   struct hash_iterator i;
   hash_first(&i, &thread_current()->spage_table);
@@ -51,8 +51,8 @@ bool eviction() {
 
     if (sp->kpage == evict_frame->page) {
       sp->in_swap_table = true;
-      pagedir_clear_page(thread_current()->pagedir, sp->upage);
-     return true;
+      s->sp = sp;
+      return true;
     }
   }
   return false;

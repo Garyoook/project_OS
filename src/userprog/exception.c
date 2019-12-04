@@ -17,6 +17,7 @@
 #include <string.h>
 #include <kernel/hash.h>
 #include <vm/page.h>
+#include "vm/swap.h"
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
@@ -193,9 +194,6 @@ page_fault (struct intr_frame *f)
   uint8_t *upage = pg_round_down(fault_addr);
   struct spage* spage1 =  lookup_spage(upage);
 
-//  if (spage1->in_swap_table == true) {
-//
-//  }
 
   if (spage1 == NULL) {
     if (fault_addr >= f->esp - 32) {
@@ -221,6 +219,11 @@ page_fault (struct intr_frame *f)
     return;} else {
       exit(-1);
     }
+  } else if (spage1->in_swap_table == true) {
+    printf("!\n");
+    uint8_t *kpage;
+    kpage = frame_create(PAL_USER, thread_current());
+    read_from_swap(spage1, kpage);
   } else {
 //    PANIC("DD");
     uint32_t read_bytes = spage1->read_bytes;
