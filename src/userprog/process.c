@@ -25,10 +25,12 @@
 #define \
   PUSH_STACK(esp, from, size) \
     { \
+        for_stack_growth = false;\
         esp = esp - size;\
         memcpy(esp, from, size);\
         bytes_used += size;\
         check_stack_overflow(bytes_used);\
+        for_stack_growth = true;\
     };
 
 static thread_func start_process NO_RETURN;
@@ -214,6 +216,7 @@ start_process (void *file_name_)
 
   cur->parent->load_success = success;
   sema_up(&cur->parent->child_load_sema);
+  list_init(&swap_table);
 
   // if load succeeded we start passing the arguments to the stack:
   if (success) {
@@ -590,7 +593,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      uint8_t *kpage = frame_create(PAL_USER, thread_current());
+      uint8_t *kpage = frame_create(PAL_USER, thread_current(), upage);
 
       if (kpage == NULL)
         return false;
@@ -627,7 +630,7 @@ setup_stack(void **esp)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = frame_create(PAL_ZERO | PAL_USER, thread_current());
+  kpage = frame_create(PAL_ZERO | PAL_USER, thread_current(), PHYS_BASE - PGSIZE);
 //      palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL)
     {

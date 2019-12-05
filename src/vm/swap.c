@@ -13,8 +13,6 @@ void init_swap_block(){
 
 void write_to_swap(void* something){
   size_t start = get_free_slot(sizeof(something));
-  lookup_spage(something)->in_swap_table = true;
-  lookup_spage(something)->position_in_swap = start;
   bitmap_set_multiple(bmap, start, sizeof(something), 1);
   block_write(b, (block_sector_t) start, something);
 }
