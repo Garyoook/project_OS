@@ -35,14 +35,13 @@ struct spage{
 
 };
 
-unsigned
-page_hash (const struct hash_elem *e, void *aux);
+void spage_init();
 
-bool
-page_less (const struct hash_elem *a, const struct hash_elem *b,
+unsigned page_hash (const struct hash_elem *e, void *aux);
+
+bool page_less (const struct hash_elem *a, const struct hash_elem *b,
            void *aux);
 
-void sub_page_table_init();
 bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
                   uint32_t read_bytes, uint32_t zero_bytes, bool writable);
 struct spage* lookup_spage(uint8_t *upage);
