@@ -3,6 +3,7 @@
 #include <debug.h>
 #include "threads/thread.h"
 #include <string.h>
+#include "threads/interrupt.h"
 #include "user/syscall.h"
 #include "frame.h"
 #include "userprog/pagedir.h"
@@ -28,23 +29,26 @@ void frame_delete(struct frame* frame1){
   pagedir_clear_page (thread_current()->pagedir, frame1->upage);
 
   palloc_free_page(frame1->page);
-  list_remove(&frame1->f_elem);
+//  list_remove(&frame1->f_elem);
   free(frame1);
 }
 
 void frame_evict() {
-
   struct frame *this_frame = list_entry(list_pop_front(&frame_table), struct frame, f_elem);
   struct swap_entry *swapEntry = malloc(sizeof(struct swap_entry));
+
   if (swapEntry == NULL) {
     exit(-1);
   }
+
   swapEntry->uspage = this_frame->upage;
+  if (this_frame->upage == 0x8149000) printf("===== evicted here!\n");
 //  printf("A%p\n", this_frame->upage);
-  swapEntry->blockSector =  write_to_swap(this_frame->page, swapEntry);
+  swapEntry->blockSector = write_to_swap(this_frame->page, swapEntry);
 //  printf("Q%x\n", swapEntry->blockSector);
   swapEntry->t_blongs_to = this_frame->t;
   list_push_back(&swap_table, &swapEntry->s_elem);
+  if (this_frame->upage == 0x8149000) swap_debug_dump();
   frame_delete(this_frame);
 }
 

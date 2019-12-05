@@ -26,8 +26,9 @@ block_sector_t write_to_swap(void* page, struct swap_entry* swapEntry){
 //  block_read(b, 0, nihao);
 //  printf("%lalalalal--------%s", nihao);
 
-  size_t start = bitmap_scan(bmap, 0, SECTOR_COUNT, 0);
-  bitmap_set_multiple(bmap, start, SECTOR_COUNT, 1);
+  size_t start = bitmap_scan_and_flip(bmap, 0, SECTOR_COUNT, 0);
+  if (start == 904) printf("GHGHGHGH\n");
+//  bitmap_set_multiple(bmap, start, SECTOR_COUNT, 1);
 //  swapEntry->blockSector = start;
 //block_print_stats();
 //  printf("qqq: %d\n", start);
@@ -40,10 +41,15 @@ block_sector_t write_to_swap(void* page, struct swap_entry* swapEntry){
 void read_from_swap(void* uspage,void* kepage) {
 //  printf("%xaaaaaaaaa\n", uspage);
   size_t  start = lookup_swap(uspage)->blockSector;
+  if (start == 904) printf(" %p\n", uspage);
   bitmap_set_multiple(bmap, start, SECTOR_COUNT, 0);
 //  printf("%xhelloaaaaaaaaaa\n", lookup_swap(uspage)->blockSector);
 
-  list_remove(&lookup_swap(uspage)->s_elem);
+  struct swap_entry *se = lookup_swap(uspage);
+  if (se == NULL) {
+    return;
+  }
+  list_remove(&se->s_elem);
   for (int i = 0; i < SECTOR_COUNT; i++){
 //    printf("%d reads\n", i);
     block_read(b, (block_sector_t) start+i, kepage + i * BLOCK_SECTOR_SIZE );
@@ -62,5 +68,17 @@ struct swap_entry* lookup_swap(void* upage) {
       e = e->next;
     }
     return NULL;
+}
+
+void swap_debug_dump(void)
+{
+  printf("==========SWAP DUMP=================\n");
+  for (struct list_elem *e = list_begin(&swap_table)
+          ; e != list_end(&swap_table)
+          ; e = list_next(e))
+  {
+    struct swap_entry *se = list_entry(e, struct swap_entry, s_elem);
+    printf("vaddr -> %p, owned by thread %s, blocksector = %d\n", se->uspage, se->t_blongs_to, se->blockSector);
+  }
 }
 

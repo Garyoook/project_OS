@@ -190,7 +190,9 @@ page_fault (struct intr_frame *f) {
     exit(EXIT_FAIL);
   }
 //  printf("fupage: %xu\n", upage);
-//  printf("K!%p\n", upage);
+  printf("K!%p\n", upage);
+  if (upage == 0x8149000) swap_debug_dump();
+  printf("bool%d\n", lookup_swap(upage) != NULL );
   if (lookup_swap(upage) != NULL && lookup_swap(upage)->t_blongs_to == thread_current()) {
     uint8_t *kp = frame_create(PAL_USER, thread_current(), upage);
 //    printf("pp\n");
