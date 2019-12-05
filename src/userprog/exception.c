@@ -31,6 +31,7 @@
 #include "threads/vaddr.h"
 #include "syscall.h"
 #include "vm/frame.h"
+#include "vm/swap.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -184,15 +185,24 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
-
+  uint8_t *upage = pg_round_down(fault_addr);
+  printf("fupage: %x\n", fault_addr);
+//  if (lookup_swap(upage) != NULL) {
+//    printf("hello\n");
+//    read_from_swap(upage);
+//  }
   if (!is_user_vaddr(fault_addr) || fault_addr == NULL || fault_addr >= PHYS_BASE
       || fault_addr < (void *) 0x08048000) {
     exit(-1);
   }
 
-  uint8_t *upage = pg_round_down(fault_addr);
+
+//  PANIC("DD");
 
   struct spage* spage1 =  lookup_spage(upage);
+
+
+
 
   if (spage1 == NULL) {
     if (fault_addr >= f->esp - 32 && for_stack_growth) {

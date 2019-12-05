@@ -198,6 +198,7 @@ start_process (void *file_name_)
   struct thread *cur = thread_current();
   bool success;
   hash_init(&cur->spage_table , &page_hash, &page_less, NULL);
+  list_init(&swap_table);
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -216,7 +217,7 @@ start_process (void *file_name_)
 
   cur->parent->load_success = success;
   sema_up(&cur->parent->child_load_sema);
-  list_init(&swap_table);
+
 
   // if load succeeded we start passing the arguments to the stack:
   if (success) {
