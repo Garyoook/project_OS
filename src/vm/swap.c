@@ -4,6 +4,7 @@
 #include "threads/vaddr.h"
 #include "threads/synch.h"
 
+#define SECTORS_PER_PAGE 8
 
 void swap_init() {
   swap_index_global = 0;
@@ -11,30 +12,30 @@ void swap_init() {
   if (swap_block == NULL) {
     return;
   }
-  swap_bmap = bitmap_create(block_size(swap_block));
+  swap_bmap = bitmap_create(block_size(swap_block)/SECTORS_PER_PAGE);
   lock_init(&swap_lock);
 }
 
-bool write_to_swap(void *kpage) {
+size_t write_to_swap(void *kpage) {
   size_t start = bitmap_scan_and_flip(swap_bmap, 0, 1, true);
   if (start == BITMAP_ERROR) {
     return false;
   }
-  block_sector_t sector_no = (block_sector_t) (start * (PGSIZE / BLOCK_SECTOR_SIZE));
+  block_sector_t sector_no = (block_sector_t) (start * SECTORS_PER_PAGE);
 
-  for(int i = 0; i < PGSIZE/BLOCK_SECTOR_SIZE; i++) {
+  for(int i = 0; i < SECTORS_PER_PAGE; i++) {
     block_write(swap_block, (block_sector_t) sector_no + i, kpage + (i * BLOCK_SECTOR_SIZE));
   }
   swap_index_global = sector_no;              // probably wrong.
-  return true;
+  return start;
 }
 
 size_t read_from_swap(void *kpage, size_t start) {
-  block_sector_t sector_no = (block_sector_t) (start * (PGSIZE / BLOCK_SECTOR_SIZE));
-  for(int i = 0; i < PGSIZE/BLOCK_SECTOR_SIZE; i++) {
+  block_sector_t sector_no = (block_sector_t) (start * SECTORS_PER_PAGE);
+  for(int i = 0; i < SECTORS_PER_PAGE; i++) {
     block_read(swap_block, (block_sector_t) (sector_no + i), kpage + (i * BLOCK_SECTOR_SIZE));
   }
-  bitmap_set(swap_bmap, start, true);
+  bitmap_flip(swap_bmap, start);
 
   return true;
 }

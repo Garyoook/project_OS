@@ -10,8 +10,11 @@
 #include "threads/vaddr.h"
 #include "lib/random.h"
 
-void frame_delete(struct frame* f);
+
 int ctr = 0;
+struct lock frame_table_lock;
+struct lock eviction_lock;
+void frame_delete(struct frame* f);
 
 void frame_table_init() {
   list_init(&frame_table);
@@ -38,12 +41,10 @@ void* frame_create(enum palloc_flags flags, struct thread *thread) {
     lock_release(&frame_table_lock);
 
   } else {
-    /* try to evict a page */
-    bool evict_success = frame_evict();
-
-    if (evict_success) {
+    if (frame_evict()) {
       kpage = palloc_get_page(flags);
       struct frame *new_frame = malloc(sizeof(struct frame));
+
       new_frame->kpage = kpage;
       new_frame->t = thread_current();
       if (!lock_held_by_current_thread(&frame_table_lock)) {
