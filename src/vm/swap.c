@@ -26,9 +26,9 @@ block_sector_t write_to_swap(void* page, struct swap_entry* swapEntry){
 //  block_read(b, 0, nihao);
 //  printf("%lalalalal--------%s", nihao);
 
-  size_t start = bitmap_scan_and_flip(bmap, 0, SECTOR_COUNT, 0);
+  size_t start = bitmap_scan(bmap, 0, SECTOR_COUNT, 0);
   if (start == 904) printf("GHGHGHGH\n");
-//  bitmap_set_multiple(bmap, start, SECTOR_COUNT, 1);
+  bitmap_set_multiple(bmap, start, SECTOR_COUNT, 1);
 //  swapEntry->blockSector = start;
 //block_print_stats();
 //  printf("qqq: %d\n", start);

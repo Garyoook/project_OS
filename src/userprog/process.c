@@ -594,14 +594,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      uint8_t *kpage = frame_create(PAL_USER, thread_current(), upage);
-
+      struct frame * f = frame_create(PAL_USER, thread_current(), upage);
+      uint8_t *kpage = f->kpage;
       if (kpage == NULL)
         return false;
 
       s->kpage = kpage;
       /* Load this page. */
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+      if (file_read (file, kpage, page_read_bytes) != page_read_bytes)
         {
           palloc_free_page (kpage);
           return false;
@@ -631,17 +631,18 @@ setup_stack(void **esp)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = frame_create(PAL_ZERO | PAL_USER, thread_current(), PHYS_BASE - PGSIZE);
+  struct frame *f = frame_create(PAL_ZERO | PAL_USER, thread_current(), PHYS_BASE - PGSIZE);
 //      palloc_get_page (PAL_USER | PAL_ZERO);
-  if (kpage != NULL)
+  if (f->kpage != NULL)
     {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, f->kpage, true);
+
       if (success) {
         struct spage *s = create_spage(NULL, 0, ((uint8_t *) PHYS_BASE) - PGSIZE, 0, 0, false);
         s->kpage = kpage;
         *esp = PHYS_BASE;
       } else {
-        palloc_free_page(kpage);
+        palloc_free_page(f->kpage);
         return success;
       }
     }
