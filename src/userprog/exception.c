@@ -225,8 +225,7 @@ page_fault(struct intr_frame *f) {
   } else {
     /* reclamation here:*/
     if (sup_page->evicted) {
-      printf("swap index : %d", swap_index);
-      read_from_swap(upage, (size_t) swap_index);
+      read_from_block(upage, (size_t) sup_page->reclaim_index);
     }
 
     /* stack growing */
