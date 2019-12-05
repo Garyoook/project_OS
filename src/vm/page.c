@@ -34,6 +34,7 @@ page_less (const struct hash_elem *a, const struct hash_elem *b,
 bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
              uint32_t read_bytes, uint32_t zero_bytes, bool writable){
   struct spage *new_page = malloc(sizeof(struct spage));
+//  printf("%zu\n", upage);
   if (new_page == NULL) {
     return false;
   }
@@ -44,6 +45,8 @@ bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
   new_page->zero_bytes = zero_bytes;
   new_page->writable = writable;
   new_page->has_load_in = false;
+  new_page->position_in_swap = 0;
+  new_page->in_swap_table = false;
   hash_insert(&thread_current()->spage_table, &new_page->pelem);
  // printf("W%d\n", file_tell(file));
 

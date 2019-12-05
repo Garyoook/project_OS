@@ -3,71 +3,46 @@
 #include <debug.h>
 #include "threads/thread.h"
 #include <string.h>
+#include "user/syscall.h"
 #include "frame.h"
-#include "page.h"
 #include "userprog/pagedir.h"
-#include "vm/swap.h"
-#include "threads/vaddr.h"
+#include "swap.h"
+int k = 0;
+void frame_delete(struct frame* frame1);
 
-void frame_delete(struct frame* f);
-int ctr = 0;
+void* frame_create(enum palloc_flags flags, struct thread *thread1, void* upage) {
+    struct frame *f = malloc(sizeof(struct frame));
+    f->page         = palloc_get_page(flags);
 
-void *frame_create(enum palloc_flags flags, void *upage) {
-  struct frame *f = malloc(sizeof(struct frame));
-  ctr++;
-  if (f == NULL) {
-    return f;
-  }
-  f->kpage         = palloc_get_page(flags);
-  if (f->kpage == NULL) {
-    printf("frame has been used up!!\n");
+    f->t            = thread1;
+    f->upage        = upage;
+  if (f->page == NULL) {
     frame_evict();
-    return NULL;
+    f->page = palloc_get_page(flags);
+//    printf("Q%x\n", f->page);
   }
-  f->t            = thread_current();
-  f->upage        = upage;
-  list_push_back(&frame_table, &f->f_elem);
-  return f->kpage;
+    list_push_back(&frame_table, &f->f_elem);
+    return f->page;
 }
 
-void frame_delete(struct frame* f){
-  palloc_free_page(f->kpage);
-  list_remove(&f->f_elem);
-  free(f);
-}
 
-void frame_update() {
-}
+void frame_delete(struct frame* frame1){
+  pagedir_clear_page (thread_current()->pagedir, frame1->upage);
 
-struct frame * lookup_frame(void *frame) {
-  struct list_elem *e = list_begin(&frame_table);
-  while (e != list_end(&frame_table)) {
-    struct frame * f = list_entry(e, struct frame, f_elem);
-    if (f == NULL) {
-      return NULL;
-    }
-    if (f->kpage == frame) {
-      return f;
-    }
-    e = e->next;
-  }
-  return NULL;
+  palloc_free_page(frame1->page);
+  list_remove(&frame1->f_elem);
+  free(frame1);
 }
 
 void frame_evict() {
-  struct list_elem *e = list_head(&frame_table);
-  ASSERT(e != NULL);
-  struct frame * frame_to_evict = list_entry(e, struct frame, f_elem);
-  void *kpage = frame_to_evict->kpage;
-  struct spage *sp = lookup_spage(frame_to_evict->upage);
-  size_t index = write_to_block(kpage);
-//  printf("PPPPPPPPPPPPPPPPPPPPPPPPPPPP   %p\n", frame_to_evict->kpage);
-  pagedir_clear_page(thread_current()->pagedir, frame_to_evict->upage);
-  list_pop_front(&frame_table);
-  sp->kpage = NULL;
-  sp->evicted = true;
-  sp->reclaim_index = index;
+  struct frame *this_frame = list_entry(list_pop_front(&frame_table), struct frame, f_elem);
+  struct swap_entry *swapEntry = malloc(sizeof(struct swap_entry));
+  swapEntry->uspage = this_frame->upage;
+  swapEntry->blockSector =  write_to_swap(this_frame->page, swapEntry);
+//  printf("Q%x\n", swapEntry->blockSector);
+  swapEntry->t_blongs_to = this_frame->t;
+  list_push_back(&swap_table, &swapEntry->s_elem);
+  frame_delete(this_frame);
 }
-
 
 

@@ -1,3 +1,6 @@
+//
+// Created by wz5918 on 30/11/19.
+//
 
 #ifndef PINTOS_47_PAGE_H
 #define PINTOS_47_PAGE_H
@@ -9,10 +12,12 @@
 #include "lib/kernel/hash.h"
 #include "list.h"
 #include "threads/palloc.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include "kernel/hash.h"
+
 #include "threads/malloc.h"
 
 struct spage{
@@ -24,9 +29,10 @@ struct spage{
   uint32_t zero_bytes;
   bool writable;
   struct hash_elem pelem;
-  size_t reclaim_index;         /*index for reclaimation */
-  bool evicted;              /*if the mapped frame of this page is evicted or not */
   bool has_load_in;
+  bool in_swap_table;
+  size_t position_in_swap;
+
 };
 
 unsigned
@@ -41,6 +47,4 @@ bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
                   uint32_t read_bytes, uint32_t zero_bytes, bool writable);
 struct spage* lookup_spage(uint8_t *upage);
 void spage_destroy(uint8_t* upage);
-
-
 #endif //PINTOS_47_PAGE_H
