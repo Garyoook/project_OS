@@ -31,6 +31,7 @@
 #include "threads/vaddr.h"
 #include "syscall.h"
 #include "vm/frame.h"
+#include "vm/swap.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -160,6 +161,7 @@ install_page (void *upage, void *kpage, bool writable)
 static void
 page_fault (struct intr_frame *f) 
 {
+
   bool not_present;  /* True: not-present page, false: writing r/o page. */
   bool write;        /* True: access was write, false: access was read. */
   bool user;         /* True: access by user, false: access by kernel. */
@@ -183,25 +185,40 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
-
-
+  uint8_t *upage = pg_round_down(fault_addr);
   if (!is_user_vaddr(fault_addr) || fault_addr == NULL || fault_addr >= PHYS_BASE
       || fault_addr < (void *) 0x08048000) {
-    exit(-1);
+    exit(EXIT_FAIL);
+  }
+//  printf("fupage: %xu\n", upage);
+  if (lookup_swap(upage) != NULL && lookup_swap(upage)->t_blongs_to == thread_current()) {
+    uint8_t *kp = frame_create(PAL_USER, thread_current(), upage);
+//    printf("pp\n");
+    install_page(upage, kp, true);
+    read_from_swap(upage, kp);
+//    printf("hello\n");
+    return;
   }
 
-  uint8_t *upage = pg_round_down(fault_addr);
+
+
+//  PANIC("DD");
+
   struct spage* spage1 =  lookup_spage(upage);
 
+
+
+
   if (spage1 == NULL) {
-    if (fault_addr >= f->esp - 32) {
+    if (fault_addr >= f->esp - 32 && for_stack_growth) {
     uint8_t *kpage;
     bool success = false;
-    kpage = frame_create(PAL_USER, thread_current());
-
+    kpage = frame_create(PAL_USER, thread_current(), PHYS_BASE - num * PGSIZE);
     if (kpage != NULL)
     {
-      if (num > 2048) exit(-1);
+      if (num > 2048) {
+        exit(EXIT_FAIL);
+      }
       success = install_page (((uint8_t *) PHYS_BASE) - num * PGSIZE, kpage, true);
       if (success){
 //        f->esp = PHYS_BASE - 2 * PGSIZE;
@@ -210,20 +227,21 @@ page_fault (struct intr_frame *f)
       }
       else {
         palloc_free_page(kpage);
-        exit(-1);
+        exit(EXIT_FAIL);
       }
     }
     return;} else {
-      exit(-1);
+      exit(EXIT_FAIL);
     }
   } else {
+//    PANIC("DD");
     uint32_t read_bytes = spage1->read_bytes;
     uint32_t zero_bytes = spage1->zero_bytes;
     uint8_t *upage = spage1->upage;
     off_t ofs = spage1->offset;
     bool writable = spage1->writable;
     if (not_present) {
-      file_seek(spage1->file1, ofs);
+      file_seek(spage1->file_sp, ofs);
       while (read_bytes > 0 || zero_bytes > 0) {
         /* Calculate how to fill this page.
            We will read PAGE_READ_BYTES bytes from FILE
@@ -231,23 +249,24 @@ page_fault (struct intr_frame *f)
         size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
         size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-        uint8_t *kpage = frame_create(PAL_USER, thread_current());
+        uint8_t *kpage = frame_create(PAL_USER, thread_current(), upage);
         spage1->kpage = kpage;
+        spage1->has_load_in = true;
 
         if (kpage == NULL)
-          exit(-1);
+          exit(EXIT_FAIL);
 
         /* Load this page. */
-        if (file_read(spage1->file1, kpage, page_read_bytes) != (int) page_read_bytes) {
+        if (file_read(spage1->file_sp, kpage, page_read_bytes) != (int) page_read_bytes) {
           palloc_free_page(kpage);
-          exit(-1);
+          exit(EXIT_FAIL);
         }
         memset(kpage + page_read_bytes, 0, page_zero_bytes);
 
         /* Add the page to the process's address space. */
         if (!install_page(upage, kpage, writable)) {
           palloc_free_page(kpage);
-          exit(-1);
+          exit(EXIT_FAIL);
         }
 
         /* Advance. */

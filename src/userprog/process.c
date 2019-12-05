@@ -6,6 +6,7 @@
 #include <string.h>
 #include <kernel/hash.h>
 #include <vm/page.h>
+#include <vm/swap.h>
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
@@ -24,10 +25,12 @@
 #define \
   PUSH_STACK(esp, from, size) \
     { \
+        for_stack_growth = false;\
         esp = esp - size;\
         memcpy(esp, from, size);\
         bytes_used += size;\
         check_stack_overflow(bytes_used);\
+        for_stack_growth = true;\
     };
 
 static thread_func start_process NO_RETURN;
@@ -195,6 +198,7 @@ start_process (void *file_name_)
   struct thread *cur = thread_current();
   bool success;
   hash_init(&cur->spage_table , &page_hash, &page_less, NULL);
+  list_init(&swap_table);
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -208,11 +212,12 @@ start_process (void *file_name_)
   // take the executable name and pass it to load();
   char *command_name, *save_ptr;
   command_name = strtok_r((char *) s, " ", &save_ptr);
-
+  init_swap_block();
   success = load (command_name, &if_.eip, &if_.esp);
 
   cur->parent->load_success = success;
   sema_up(&cur->parent->child_load_sema);
+
 
   // if load succeeded we start passing the arguments to the stack:
   if (success) {
@@ -579,42 +584,42 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (ofs % PGSIZE == 0);
 
   create_spage(file, ofs, upage, read_bytes, zero_bytes, writable);
-//  file_seek (file, ofs);
-//  while (read_bytes > 0 || zero_bytes > 0)
-//    {
-//      /* Calculate how to fill this page.
-//         We will read PAGE_READ_BYTES bytes from FILE
-//         and zero the final PAGE_ZERO_BYTES bytes. */
-//      size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
-//      size_t page_zero_bytes = PGSIZE - page_read_bytes;
-//
-////      /* Get a page of memory. */
-////      uint8_t *kpage = frame_create(PAL_USER, thread_current());
-////
-////      if (kpage == NULL)
-////        return false;
-//
-//
-////      /* Load this page. */
-////      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-////        {
-////          palloc_free_page (kpage);
-////          return false;
-////        }
-////      memset (kpage + page_read_bytes, 0, page_zero_bytes);
-////
-////      /* Add the page to the process's address space. */
-////      if (!install_page (upage, kpage, writable))
-////        {
-////          palloc_free_page (kpage);
-////          return false;
-////        }
-//
-//      /* Advance. */
-//      read_bytes -= page_read_bytes;
-//      zero_bytes -= page_zero_bytes;
-//      upage += PGSIZE;
-//    }
+  file_seek (file, ofs);
+  while (read_bytes > 0 || zero_bytes > 0)
+    {
+      /* Calculate how to fill this page.
+         We will read PAGE_READ_BYTES bytes from FILE
+         and zero the final PAGE_ZERO_BYTES bytes. */
+      size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+      size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+      /* Get a page of memory. */
+      uint8_t *kpage = frame_create(PAL_USER, thread_current(), upage);
+
+      if (kpage == NULL)
+        return false;
+
+
+      /* Load this page. */
+      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+        {
+          palloc_free_page (kpage);
+          return false;
+        }
+      memset (kpage + page_read_bytes, 0, page_zero_bytes);
+
+      /* Add the page to the process's address space. */
+      if (!install_page (upage, kpage, writable))
+        {
+          palloc_free_page (kpage);
+          return false;
+        }
+
+      /* Advance. */
+      read_bytes -= page_read_bytes;
+      zero_bytes -= page_zero_bytes;
+      upage += PGSIZE;
+    }
   return true;
 }
 
@@ -626,7 +631,7 @@ setup_stack(void **esp)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = frame_create(PAL_ZERO | PAL_USER, thread_current());
+  kpage = frame_create(PAL_ZERO | PAL_USER, thread_current(), PHYS_BASE - PGSIZE);
 //      palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL)
     {

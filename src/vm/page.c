@@ -8,6 +8,7 @@
 #include "userprog/pagedir.h"
 #include "threads/thread.h"
 #include "threads/malloc.h"
+#include "threads/vaddr.h"
 
 
 
@@ -33,16 +34,19 @@ page_less (const struct hash_elem *a, const struct hash_elem *b,
 bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
              uint32_t read_bytes, uint32_t zero_bytes, bool writable){
   struct spage *new_page = malloc(sizeof(struct spage));
+//  printf("%zu\n", upage);
   if (new_page == NULL) {
     return false;
   }
-  new_page->file1 = file;
+  new_page->file_sp = file;
   new_page->offset = ofs;
   new_page->upage = upage;
   new_page->read_bytes = read_bytes;
   new_page->zero_bytes = zero_bytes;
   new_page->writable = writable;
-  new_page->for_lazy_load = true;
+  new_page->has_load_in = false;
+  new_page->position_in_swap = 0;
+  new_page->in_swap_table = false;
   hash_insert(&thread_current()->spage_table, &new_page->pelem);
  // printf("W%d\n", file_tell(file));
 
@@ -56,10 +60,11 @@ bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
       struct spage *sp = hash_entry (hash_cur(&i), struct spage, pelem);
       if (sp == NULL)
         break;
-      if (file == sp->file1 && !sp->writable) {
+      if (file == sp->file_sp && !sp->writable) {
         new_page->kpage = sp->kpage;
 
         if (new_page->kpage != NULL) {
+          printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAHH\n");
           bool install_page = (pagedir_get_page(t->pagedir, upage) == NULL
                                && pagedir_set_page(t->pagedir, upage, new_page->kpage, writable));
           if (!install_page)
@@ -69,13 +74,8 @@ bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
       }
     }
   }
-
-  bool something = *upage;
   file_seek(file, 0);
-//  printf("W%d\n", file_tell(file));
-//  *upage;
-//  printf("PPPPPPPPPPPPPPPPPage addr remembered: %u\n", (uint32_t) *upage);
-  return (bool) something;
+  return true;
 }
 
 struct spage * lookup_spage(uint8_t* upage) {

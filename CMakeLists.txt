@@ -325,6 +325,7 @@ add_executable(pintos_47
         src/vm/page.c
         src/vm/page.h
         src/vm/swap.c
-        src/vm/swap.h)
+        src/vm/swap.h
+        )
 
 add_definitions(-DUSERPROG -DFILESYS)

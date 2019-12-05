@@ -13,7 +13,6 @@
 #include "list.h"
 #include "threads/palloc.h"
 
-#include "page.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -22,7 +21,7 @@
 #include "threads/malloc.h"
 
 struct spage{
-  struct file *file1;
+  struct file *file_sp;
   off_t offset;
   uint8_t *upage;
   uint8_t *kpage;
@@ -30,7 +29,10 @@ struct spage{
   uint32_t zero_bytes;
   bool writable;
   struct hash_elem pelem;
-  bool for_lazy_load;
+  bool has_load_in;
+  bool in_swap_table;
+  size_t position_in_swap;
+
 };
 
 unsigned
