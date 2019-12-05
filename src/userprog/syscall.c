@@ -537,10 +537,7 @@ void munmap(mapid_t mapping) {
           if (load_file_in) {
             printf("");
           }
-
         }
-
-
         fileFd->mmaped = false;
 
         if (!fileFd->reopened)
@@ -556,9 +553,6 @@ void munmap(mapid_t mapping) {
         file_seek(fileFd->f, 0);
         pagedir_clear_page(cur->pagedir, fileFd->addr);
         spage_destroy(fileFd->addr);
-
-
-
       }
       e = e->next;
     }

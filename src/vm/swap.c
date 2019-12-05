@@ -41,7 +41,7 @@ block_sector_t write_to_swap(void* page, struct swap_entry* swapEntry){
 void read_from_swap(void* uspage,void* kepage) {
 //  printf("%xaaaaaaaaa\n", uspage);
   size_t  start = lookup_swap(uspage)->blockSector;
-  if (start == 904) printf(" %p\n", uspage);
+  if (start == 904) printf(" HDDGHDHDH%p\n", uspage);
   bitmap_set_multiple(bmap, start, SECTOR_COUNT, 0);
 //  printf("%xhelloaaaaaaaaaa\n", lookup_swap(uspage)->blockSector);
 

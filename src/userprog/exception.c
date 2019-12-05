@@ -159,8 +159,7 @@ kill (struct intr_frame *f)
 //}
 
 static void
-page_fault (struct intr_frame *f) 
-{
+page_fault (struct intr_frame *f) {
 
   bool not_present;  /* True: not-present page, false: writing r/o page. */
   bool write;        /* True: access was write, false: access was read. */
@@ -192,7 +191,7 @@ page_fault (struct intr_frame *f)
   }
 //  printf("fupage: %xu\n", upage);
 //  printf("K!%p\n", upage);
-  if (upage == 0x8149000) swap_debug_dump();
+//  if (upage == 0x8149000) swap_debug_dump();
 //  printf("bool%d\n", lookup_swap(upage) != NULL );
   if (lookup_swap(upage) != NULL && lookup_swap(upage)->t_blongs_to == thread_current()) {
     struct frame* frame = frame_create(PAL_USER, thread_current(), upage);
@@ -213,21 +212,21 @@ page_fault (struct intr_frame *f)
     if (fault_addr >= f->esp - 32 && for_stack_growth) {
     bool success = false;
     struct frame* frame = frame_create(PAL_USER, thread_current(), PHYS_BASE - num * PGSIZE);
-    if (frame->kpage != NULL)
-    {
+    if (frame->kpage != NULL) {
       if (num > 2048) {
         exit(EXIT_FAIL);
       }
-      success = install_page (((uint8_t *) PHYS_BASE) - num * PGSIZE, frame->kpage, true);
-      if (success){
-//        f->esp = PHYS_BASE - 2 * PGSIZE;
+      success = install_page(((uint8_t *) PHYS_BASE) - num * PGSIZE, frame->kpage, true);
+      if (success) {
+        struct spage *s = create_spage(NULL, 0, ((uint8_t *) PHYS_BASE) - num * PGSIZE, 0, 0, false);
+        s->kpage = frame->kpage;   //sharing
         num++;
         thread_current()->stack = PHYS_BASE - PGSIZE;
-      }
-      else {
+      } else {
         palloc_free_page(frame->kpage);
         exit(EXIT_FAIL);
       }
+    }
       return;
     } else {
 //      printf("Q!%p\n", upage);
@@ -255,7 +254,7 @@ page_fault (struct intr_frame *f)
 
         if (frame->kpage == NULL)
           exit(EXIT_FAIL);
-        s_page->kpage = frame->kpage;
+        s_page->kpage = frame->kpage; // sgaring
 
         /* Load this page. */
         if (file_read(s_page->file_sp, frame->kpage, page_read_bytes) != (int) page_read_bytes) {
@@ -289,11 +288,11 @@ page_fault (struct intr_frame *f)
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  printf("Page fault at %p: %s error %s page in %s context.\n",
-         fault_addr,
-         not_present ? "not present" : "rights violation",
-         write ? "writing" : "reading",
-         user ? "user" : "kernel");
-  kill(f);
+  printf ("Page fault at %p: %s error %s page in %s context.\n",
+          fault_addr,
+          not_present ? "not present" : "rights violation",
+          write ? "writing" : "reading",
+          user ? "user" : "kernel");
+  kill (f);
 }
 

@@ -50,8 +50,9 @@ struct frame * lookup_frame(void *frame) {
   return NULL;
 }
 
+
 void frame_evict() {
-  struct frame *this_frame = list_entry(list_pop_front(&frame_table), struct frame, f_elem);
+  struct frame *this_frame = get_frame_to_evict();
   struct swap_entry *swapEntry = malloc(sizeof(struct swap_entry));
 
   if (swapEntry == NULL) {
@@ -60,13 +61,11 @@ void frame_evict() {
 
   swapEntry->uspage = this_frame->upage;
   swapEntry->blockSector =  write_to_swap(this_frame->kpage, swapEntry);
-  if (this_frame->upage == 0x8149000) printf("===== evicted here!\n");
-//  printf("A%p\n", this_frame->upage);
-  swapEntry->blockSector = write_to_swap(this_frame->kpage, swapEntry);
-//  printf("Q%x\n", swapEntry->blockSector);
+//  if (this_frame->upage == 0x8149000) printf("===== evicted here!\n");
+  //  printf("Q%x\n", swapEntry->blockSector);
   swapEntry->t_blongs_to = this_frame->owner_thread;
   list_push_back(&swap_table, &swapEntry->s_elem);
-  if (this_frame->upage == 0x8149000) swap_debug_dump();
+//  if (this_frame->upage == 0x8149000) swap_debug_dump();
   frame_delete(this_frame);
 }
 
