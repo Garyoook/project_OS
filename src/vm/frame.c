@@ -12,7 +12,7 @@
 void frame_delete(struct frame* f);
 int ctr = 0;
 
-void* frame_create(enum palloc_flags flags, struct thread *thread, void *upage) {
+void *frame_create(enum palloc_flags flags, void *upage) {
   struct frame *f = malloc(sizeof(struct frame));
   ctr++;
   if (f == NULL) {
@@ -24,7 +24,7 @@ void* frame_create(enum palloc_flags flags, struct thread *thread, void *upage) 
     frame_evict();
     return NULL;
   }
-  f->t            = thread;
+  f->t            = thread_current();
   f->upage        = upage;
   list_push_back(&frame_table, &f->f_elem);
   return f->kpage;
@@ -55,20 +55,18 @@ struct frame * lookup_frame(void *frame) {
 }
 
 void frame_evict() {
-  printf("%zu\n", list_size(&frame_table));
   struct list_elem *e = list_head(&frame_table);
   ASSERT(e != NULL);
   struct frame * frame_to_evict = list_entry(e, struct frame, f_elem);
   void *kpage = frame_to_evict->kpage;
   struct spage *sp = lookup_spage(frame_to_evict->upage);
-  write_to_swap(kpage);
+  size_t index = write_to_block(kpage);
 //  printf("PPPPPPPPPPPPPPPPPPPPPPPPPPPP   %p\n", frame_to_evict->kpage);
   pagedir_clear_page(thread_current()->pagedir, frame_to_evict->upage);
   list_pop_front(&frame_table);
   sp->kpage = NULL;
   sp->evicted = true;
-  swap_index++;
-  sp->reclaim_index = swap_index;
+  sp->reclaim_index = index;
 }
 
 

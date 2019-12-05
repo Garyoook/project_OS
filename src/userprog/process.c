@@ -591,7 +591,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      uint8_t *kpage = frame_create(PAL_USER, thread_current(), upage);
+      uint8_t *kpage = frame_create(PAL_USER, upage);
 
       if (kpage == NULL)
         return false;
@@ -628,7 +628,7 @@ setup_stack(void **esp)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = frame_create(PAL_ZERO | PAL_USER, thread_current(), ((uint8_t *) PHYS_BASE) - PGSIZE);
+  kpage = frame_create(PAL_ZERO | PAL_USER, ((uint8_t *) PHYS_BASE) - PGSIZE);
 //      palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL)
     {

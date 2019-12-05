@@ -17,7 +17,7 @@ struct frame{
 };
 
 struct list frame_table;
-void* frame_create(enum palloc_flags flags, struct thread *thread, void *upage);
+void *frame_create(enum palloc_flags flags, void *upage);
 void frame_evict(void);
 struct frame * lookup_frame(void *frame);
 
