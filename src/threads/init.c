@@ -94,7 +94,7 @@ main (void)
   console_init ();
 
 
-  list_init(&frame_table);
+//  list_init(&frame_table);
 
   /* Greet user. */
   printf ("Pintos booting with %'"PRIu32" kB RAM...\n",

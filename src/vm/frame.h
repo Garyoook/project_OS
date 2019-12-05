@@ -17,8 +17,12 @@ struct frame{
 };
 
 struct list frame_table;
+struct lock frame_table_lock;
+struct lock eviction_lock;
+
+void frame_table_init();
 void* frame_create(enum palloc_flags flags, struct thread *thread);
-void frame_evict(void);
+bool frame_evict(void);
 struct frame * lookup_frame(void *frame);
 
 #endif //PINTOS_47_FRAME_H

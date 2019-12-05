@@ -214,10 +214,6 @@ page_fault(struct intr_frame *f) {
           exit(-1);
         }
       }
-//      else {
-//        printf("Now evict: \n");
-//        frame_evict(kpage);
-//      }
       return;
     } else {
       exit(-1);
@@ -225,8 +221,8 @@ page_fault(struct intr_frame *f) {
   } else {
     /* reclamation here:*/
     if (sup_page->evicted) {
-      printf("swap index : %d", swap_index);
-      read_from_swap(upage, (size_t) swap_index);
+      printf("swap index : %d", swap_index_global);
+      read_from_swap(upage, sup_page->swap_index);
     }
 
     /* stack growing */
