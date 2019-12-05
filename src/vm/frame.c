@@ -3,155 +3,46 @@
 #include <debug.h>
 #include "threads/thread.h"
 #include <string.h>
+#include "user/syscall.h"
 #include "frame.h"
-#include "page.h"
 #include "userprog/pagedir.h"
-#include "vm/swap.h"
-#include "threads/vaddr.h"
-#include "lib/random.h"
+#include "swap.h"
+int k = 0;
+void frame_delete(struct frame* frame1);
 
-
-int ctr = 0;
-struct lock frame_table_lock;
-struct lock eviction_lock;
-void frame_delete(struct frame* f);
-
-void frame_table_init() {
-  list_init(&frame_table);
-  lock_init(&frame_table_lock);
-  lock_init(&eviction_lock);
-}
-
-void* frame_create(enum palloc_flags flags, struct thread *thread) {
-
-  void * kpage = palloc_get_page(flags);
-
-  if (kpage != NULL) { // palloc success
-
-    // add a new frame table entry
+void* frame_create(enum palloc_flags flags, struct thread *thread1, void* upage) {
     struct frame *f = malloc(sizeof(struct frame));
-    f->kpage = kpage;
-    f->t = thread_current();
+    f->page         = palloc_get_page(flags);
 
-    if (!lock_held_by_current_thread(&frame_table_lock)) {
-      lock_acquire(&frame_table_lock);
-    }
-
+    f->t            = thread1;
+    f->upage        = upage;
+  if (f->page == NULL) {
+    frame_evict();
+    f->page = palloc_get_page(flags);
+//    printf("Q%x\n", f->page);
+  }
     list_push_back(&frame_table, &f->f_elem);
-    lock_release(&frame_table_lock);
-
-  } else {
-    if (frame_evict()) {
-      kpage = palloc_get_page(flags);
-      struct frame *new_frame = malloc(sizeof(struct frame));
-
-      new_frame->kpage = kpage;
-      new_frame->t = thread_current();
-      if (!lock_held_by_current_thread(&frame_table_lock)) {
-        lock_acquire(&frame_table_lock);
-      }
-      list_push_back(&frame_table, &new_frame->f_elem);
-      lock_release(&frame_table_lock);
-    } else {
-      PANIC ("Evict failed");
-    }
-
-  }
-  return kpage;
-}
-
-void frame_delete(struct frame* f) {
-  palloc_free_page(f->kpage);
-  list_remove(&f->f_elem);
-  free(f);
-}
-
-void frame_update() {
-}
-
-struct frame * lookup_frame(void *frame) {
-  struct list_elem *e = list_begin(&frame_table);
-  while (e != list_end(&frame_table)) {
-    struct frame * f = list_entry(e, struct frame, f_elem);
-    if (f == NULL) {
-      return NULL;
-    }
-    if (f->kpage == frame) {
-      return f;
-    }
-    e = e->next;
-  }
-  return NULL;
-}
-
-struct frame *choose_by_evict_policy();
-
-struct frame *choose_by_evict_policy()
-{
-  // random number
-  int list_length = (int) list_size(&frame_table);
-  int r = (int) (random_ulong() % list_length);
-  if (r < 0) {
-    r = -r;
-  }
-
-  printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAFFFFFFFFF %d\n", r);
-  struct frame * frame_to_evict;
-
-  if (!lock_held_by_current_thread(&frame_table_lock)) {
-    lock_acquire(&frame_table_lock);
-  }
-
-  struct list_elem * e;
-  e = list_begin(&frame_table);
-  while (r > 0) {
-    e = list_next(e);
-    r--;
-  }
-
-  frame_to_evict = list_entry(e, struct frame, f_elem);
-
-  lock_release(&frame_table_lock);
-  return frame_to_evict;
+    return f->page;
 }
 
 
-bool frame_evict() {
-  struct frame * frame_to_evict;
-  frame_to_evict = choose_by_evict_policy();
+void frame_delete(struct frame* frame1){
+  pagedir_clear_page (thread_current()->pagedir, frame1->upage);
 
-  // locate the s_page_table_entry
-  struct spage * spage = lookup_spage(frame_to_evict->upage);
-
-  // make sure the spage is not evicted already.
-  while (spage->evicted == true) {
-    frame_to_evict = choose_by_evict_policy();
-    spage = lookup_spage(frame_to_evict->upage);
-  }
-
-  if (spage == NULL) {
-    PANIC("No page is linked with this frame");
-  }
-
-  spage->evicted = true;
-  struct thread * t = frame_to_evict->t;
-
-  // swap out
-  spage->swap_index = write_to_swap (spage->upage);
-
-  // remove reference
-  pagedir_clear_page(t->pagedir, spage->upage);
-
-  // free the frame
-  list_remove(&frame_to_evict->f_elem);
-  palloc_free_page(frame_to_evict->kpage);
-
-  spage->swapped = true;
-
-  // success
-  return true;
-
+  palloc_free_page(frame1->page);
+  list_remove(&frame1->f_elem);
+  free(frame1);
 }
 
+void frame_evict() {
+  struct frame *this_frame = list_entry(list_pop_front(&frame_table), struct frame, f_elem);
+  struct swap_entry *swapEntry = malloc(sizeof(struct swap_entry));
+  swapEntry->uspage = this_frame->upage;
+  swapEntry->blockSector =  write_to_swap(this_frame->page, swapEntry);
+//  printf("Q%x\n", swapEntry->blockSector);
+  swapEntry->t_blongs_to = this_frame->t;
+  list_push_back(&swap_table, &swapEntry->s_elem);
+  frame_delete(this_frame);
+}
 
 

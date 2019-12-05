@@ -4,6 +4,7 @@
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
+#include <vm/swap.h>
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -95,8 +96,6 @@ thread_init (void)
   list_init (&all_list);
   list_init (&blocked_list);
 
-  /*vm*/
-  frame_table_init();
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
