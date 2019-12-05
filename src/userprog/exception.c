@@ -192,10 +192,10 @@ page_fault (struct intr_frame *f)
   }
 //  printf("fupage: %xu\n", upage);
   if (lookup_swap(upage) != NULL && lookup_swap(upage)->t_blongs_to == thread_current()) {
-    uint8_t *kp = frame_create(PAL_USER, thread_current(), upage);
+    struct frame* frame = frame_create(PAL_USER, thread_current(), upage);
 //    printf("pp\n");
-    install_page(upage, kp, true);
-    read_from_swap(upage, kp);
+    install_page(upage, frame->kpage, true);
+    read_from_swap(upage, frame->kpage);
 //    printf("hello\n");
     return;
   }
@@ -204,29 +204,25 @@ page_fault (struct intr_frame *f)
 
 //  PANIC("DD");
 
-  struct spage* spage1 =  lookup_spage(upage);
+  struct spage* s_page =  lookup_spage(upage);
 
-
-
-
-  if (spage1 == NULL) {
+  if (s_page == NULL) {
     if (fault_addr >= f->esp - 32 && for_stack_growth) {
-    uint8_t *kpage;
     bool success = false;
-    kpage = frame_create(PAL_USER, thread_current(), PHYS_BASE - num * PGSIZE);
-    if (kpage != NULL)
+    struct frame* frame = frame_create(PAL_USER, thread_current(), PHYS_BASE - num * PGSIZE);
+    if (frame->kpage != NULL)
     {
       if (num > 2048) {
         exit(EXIT_FAIL);
       }
-      success = install_page (((uint8_t *) PHYS_BASE) - num * PGSIZE, kpage, true);
+      success = install_page (((uint8_t *) PHYS_BASE) - num * PGSIZE, frame->kpage, true);
       if (success){
 //        f->esp = PHYS_BASE - 2 * PGSIZE;
         num++;
         thread_current()->stack = PHYS_BASE - PGSIZE;
       }
       else {
-        palloc_free_page(kpage);
+        palloc_free_page(frame->kpage);
         exit(EXIT_FAIL);
       }
     }
@@ -235,13 +231,13 @@ page_fault (struct intr_frame *f)
     }
   } else {
 //    PANIC("DD");
-    uint32_t read_bytes = spage1->read_bytes;
-    uint32_t zero_bytes = spage1->zero_bytes;
-    uint8_t *upage = spage1->upage;
-    off_t ofs = spage1->offset;
-    bool writable = spage1->writable;
+    uint32_t read_bytes = s_page->read_bytes;
+    uint32_t zero_bytes = s_page->zero_bytes;
+    uint8_t *upage_grow = s_page->upage;
+    off_t ofs = s_page->offset;
+    bool writable = s_page->writable;
     if (not_present) {
-      file_seek(spage1->file_sp, ofs);
+      file_seek(s_page->file_sp, ofs);
       while (read_bytes > 0 || zero_bytes > 0) {
         /* Calculate how to fill this page.
            We will read PAGE_READ_BYTES bytes from FILE
@@ -249,30 +245,30 @@ page_fault (struct intr_frame *f)
         size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
         size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-        uint8_t *kpage = frame_create(PAL_USER, thread_current(), upage);
-        spage1->kpage = kpage;
-        spage1->has_load_in = true;
+        struct frame *frame = frame_create(PAL_USER, thread_current(), upage_grow);
+        s_page->kpage = frame->kpage;
+        s_page->has_load_in = true;
 
-        if (kpage == NULL)
+        if (frame->kpage == NULL)
           exit(EXIT_FAIL);
 
         /* Load this page. */
-        if (file_read(spage1->file_sp, kpage, page_read_bytes) != (int) page_read_bytes) {
-          palloc_free_page(kpage);
+        if (file_read(s_page->file_sp, frame->kpage, page_read_bytes) != (int) page_read_bytes) {
+          palloc_free_page(frame->kpage);
           exit(EXIT_FAIL);
         }
-        memset(kpage + page_read_bytes, 0, page_zero_bytes);
+        memset(frame->kpage + page_read_bytes, 0, page_zero_bytes);
 
         /* Add the page to the process's address space. */
-        if (!install_page(upage, kpage, writable)) {
-          palloc_free_page(kpage);
+        if (!install_page(upage_grow, frame->kpage, writable)) {
+          palloc_free_page(frame->kpage);
           exit(EXIT_FAIL);
         }
 
         /* Advance. */
         read_bytes -= page_read_bytes;
         zero_bytes -= page_zero_bytes;
-        upage += PGSIZE;
+        upage_grow += PGSIZE;
       }
       return;
     }

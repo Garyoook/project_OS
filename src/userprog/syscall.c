@@ -233,9 +233,9 @@ exit (int status) {
   }
 
   // if exit by an error, release all locks.
-  if (status == EXIT_FAIL) {
-    release_all_locks(thread_current());
-  }
+//  if (status == EXIT_FAIL) {
+//    release_all_locks(thread_current());
+//  }
 
   struct hash_iterator i;
   hash_first(&i, &cur->spage_table);
