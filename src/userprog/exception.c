@@ -191,6 +191,7 @@ page_fault (struct intr_frame *f)
     exit(EXIT_FAIL);
   }
 //  printf("fupage: %xu\n", upage);
+//printf("K!%p\n", upage);
   if (lookup_swap(upage) != NULL && lookup_swap(upage)->t_blongs_to == thread_current()) {
     struct frame* frame = frame_create(PAL_USER, thread_current(), upage);
 //    printf("pp\n");

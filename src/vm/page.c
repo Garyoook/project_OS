@@ -9,7 +9,13 @@
 #include "threads/thread.h"
 #include "threads/malloc.h"
 
+struct lock spage_lock;
 
+
+void spage_init() {
+  lock_init(&spage_lock);
+  hash_init(&thread_current()->spage_table , &page_hash, &page_less, NULL);
+}
 
 unsigned
 page_hash (const struct hash_elem *e, void *aux UNUSED)
@@ -46,7 +52,9 @@ struct spage *create_spage(struct file *file, off_t ofs, uint8_t *upage,
   new_page->has_load_in = false;
   new_page->position_in_swap = 0;
   new_page->in_swap_table = false;
+  lock_acquire(&spage_lock);
   hash_insert(&thread_current()->spage_table, &new_page->pelem);
+  lock_release(&spage_lock);
  // printf("W%d\n", file_tell(file));
   if (file != NULL) {
 //sharing
@@ -81,7 +89,9 @@ struct spage *create_spage(struct file *file, off_t ofs, uint8_t *upage,
 struct spage * lookup_spage(uint8_t* upage) {
   struct spage page;
   page.upage = upage;
+  lock_acquire(&spage_lock);
   struct hash_elem *e = hash_find(&thread_current()->spage_table, &page.pelem);
+  lock_release(&spage_lock);
   return e != NULL ? hash_entry(e, struct spage, pelem): NULL;
 }
 
@@ -90,7 +100,9 @@ void spage_destroy(uint8_t* upage) {
   if (!page) {
     return;
   }
+  lock_acquire(&spage_lock);
   hash_delete(&thread_current()->spage_table, &page->pelem);
   free(page);
+  lock_release(&spage_lock);
 
 }
