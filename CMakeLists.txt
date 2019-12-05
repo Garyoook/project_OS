@@ -20,6 +20,7 @@ include_directories(src/tests/vm)
 include_directories(src/threads)
 include_directories(src/userprog)
 include_directories(src)
+include_directories(src/vm)
 
 add_executable(pintos_47
         specs/kbd/table.h
@@ -322,6 +323,9 @@ add_executable(pintos_47
         src/vm/frame.c
         src/vm/frame.h
         src/vm/page.c
-        src/vm/page.h)
+        src/vm/page.h
+        src/vm/swap.c
+        src/vm/swap.h
+        )
 
 add_definitions(-DUSERPROG -DFILESYS)
