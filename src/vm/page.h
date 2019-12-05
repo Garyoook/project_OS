@@ -13,6 +13,7 @@
 #include "list.h"
 #include "threads/palloc.h"
 
+#include "page.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -29,10 +30,11 @@ struct spage{
   uint32_t zero_bytes;
   bool writable;
   struct hash_elem pelem;
-  bool has_load_in;
-  bool in_swap_table;
+  bool for_lazy_load;
+  bool  has_load_in;
   size_t position_in_swap;
-
+  bool in_swap_table;
+  int md;
 };
 
 unsigned
@@ -43,7 +45,7 @@ page_less (const struct hash_elem *a, const struct hash_elem *b,
            void *aux);
 
 void sub_page_table_init();
-bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
+struct spage *create_spage(struct file *file, off_t ofs, uint8_t *upage,
                   uint32_t read_bytes, uint32_t zero_bytes, bool writable);
 struct spage* lookup_spage(uint8_t *upage);
 void spage_destroy(uint8_t* upage);

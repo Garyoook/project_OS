@@ -147,16 +147,16 @@ kill (struct intr_frame *f)
    can find more information about both of these in the
    description of "Interrupt 14--Page Fault Exception (#PF)" in
    [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
-bool
-install_page (void *upage, void *kpage, bool writable)
-{
-  struct thread *t = thread_current ();
-
-  /* Verify that there's not already a page at that virtual
-     address, then map our page there. */
-  return (pagedir_get_page (t->pagedir, upage) == NULL
-          && pagedir_set_page (t->pagedir, upage, kpage, writable));
-}
+//bool
+//install_page (void *upage, void *kpage, bool writable)
+//{
+//  struct thread *t = thread_current ();
+//
+//  /* Verify that there's not already a page at that virtual
+//     address, then map our page there. */
+//  return (pagedir_get_page (t->pagedir, upage) == NULL
+//          && pagedir_set_page (t->pagedir, upage, kpage, writable));
+//}
 
 static void
 page_fault (struct intr_frame *f) 
@@ -217,7 +217,8 @@ page_fault (struct intr_frame *f)
       }
       success = install_page (((uint8_t *) PHYS_BASE) - num * PGSIZE, frame->kpage, true);
       if (success){
-//        f->esp = PHYS_BASE - 2 * PGSIZE;
+        struct spage *s = create_spage(NULL, 0, ((uint8_t *) PHYS_BASE) - num * PGSIZE, 0, 0, false);
+        s->kpage = frame->kpage;   //sharing
         num++;
         thread_current()->stack = PHYS_BASE - PGSIZE;
       }
@@ -251,6 +252,7 @@ page_fault (struct intr_frame *f)
 
         if (frame->kpage == NULL)
           exit(EXIT_FAIL);
+        s_page->kpage = frame->kpage; // sgaring
 
         /* Load this page. */
         if (file_read(s_page->file_sp, frame->kpage, page_read_bytes) != (int) page_read_bytes) {

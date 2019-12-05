@@ -95,8 +95,10 @@ syscall_handler (struct intr_frame *f UNUSED)
   void **snd = (void **)(f->esp) + 2;
   void **trd = (void **)(f->esp) + 3;
 
+// printf("AAAAAAa%d\n", syscall_num);
   switch (syscall_num) {
     case SYS_EXEC:
+      if (!safe_access(fst)) f->eax = (uint32_t) EXIT_FAIL;
       f->eax = (uint32_t) exec(*(char **)fst);
       break;
     case SYS_CLOSE:
@@ -505,7 +507,9 @@ mapid_t mmap(int fd, void *addr) {
       fileFd->addr = addr;
       fileFd->mmaped = true;
       uint32_t zero_set = ((uint32_t)file_size) % PGSIZE;
-      create_spage(fileFd->f, file_tell(fileFd->f), addr, (uint32_t) file_length(fileFd->f), PGSIZE - zero_set, true);
+      struct spage *s = create_spage(fileFd->f, file_tell(fileFd->f), addr,
+                        (uint32_t) file_length(fileFd->f), PGSIZE - zero_set, true);
+      s->md = fd;
       return fd;
     }
   }
@@ -547,14 +551,9 @@ void munmap(mapid_t mapping) {
 
         file_allow_write(fileFd->f);
         if (!fileFd->dirty) {
-
           file_write_at(fileFd->f, fileFd->addr, file_size, 0);
-        }file_seek(fileFd->f, 0);
-
-
-//        printf("String to be written in: \n%s\n", temp);
-//        printf("String in target position: \n%s\n", (char *) fileFd->addr);
-
+        }
+        file_seek(fileFd->f, 0);
         pagedir_clear_page(cur->pagedir, fileFd->addr);
         spage_destroy(fileFd->addr);
 

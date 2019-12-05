@@ -6,7 +6,7 @@
 #include <string.h>
 #include <kernel/hash.h>
 #include <vm/page.h>
-#include <vm/swap.h>
+#include "vm/swap.h"
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
@@ -583,7 +583,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
-  create_spage(file, ofs, upage, read_bytes, zero_bytes, writable);
+  struct spage *s = create_spage(file, ofs, upage, read_bytes, zero_bytes, writable);
   file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0)
     {
@@ -599,7 +599,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       if (kpage == NULL)
         return false;
 
-
+      s->kpage = kpage;
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != page_read_bytes)
         {
@@ -614,9 +614,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
           palloc_free_page (kpage);
           return false;
         }
-
-        /*for eviction*/
-//      f->referenced = true;
 
       /* Advance. */
       read_bytes -= page_read_bytes;
@@ -639,9 +636,6 @@ setup_stack(void **esp)
   if (f->kpage != NULL)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, f->kpage, true);
-
-      /*for eviction*/
-//      f->referenced = true;
 
       if (success)
         *esp = PHYS_BASE;

@@ -8,7 +8,6 @@
 #include "userprog/pagedir.h"
 #include "threads/thread.h"
 #include "threads/malloc.h"
-#include "threads/vaddr.h"
 
 
 
@@ -31,7 +30,7 @@ page_less (const struct hash_elem *a, const struct hash_elem *b,
 }
 
 
-bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
+struct spage *create_spage(struct file *file, off_t ofs, uint8_t *upage,
              uint32_t read_bytes, uint32_t zero_bytes, bool writable){
   struct spage *new_page = malloc(sizeof(struct spage));
 //  printf("%zu\n", upage);
@@ -49,12 +48,12 @@ bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
   new_page->in_swap_table = false;
   hash_insert(&thread_current()->spage_table, &new_page->pelem);
  // printf("W%d\n", file_tell(file));
-
-
-  if (!writable) {
-    struct hash_iterator i;
-    struct thread *t = thread_current();
-    hash_first(&i, &t->spage_table);
+  if (file != NULL) {
+//sharing
+    if (!writable) {
+      struct hash_iterator i;
+      struct thread *t = thread_current();
+      hash_first(&i, &t->spage_table);
 
     while (hash_next(&i)) {
       struct spage *sp = hash_entry (hash_cur(&i), struct spage, pelem);
@@ -63,19 +62,20 @@ bool create_spage(struct file *file, off_t ofs, uint8_t *upage,
       if (file == sp->file_sp && !sp->writable) {
         new_page->kpage = sp->kpage;
 
-        if (new_page->kpage != NULL) {
-          printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAHH\n");
-          bool install_page = (pagedir_get_page(t->pagedir, upage) == NULL
-                               && pagedir_set_page(t->pagedir, upage, new_page->kpage, writable));
-          if (!install_page)
-            exit(-1);
+          if (new_page->kpage != NULL) {
+            bool install_page = (pagedir_get_page(t->pagedir, upage) == NULL
+                                 && pagedir_set_page(t->pagedir, upage, new_page->kpage, writable));
+            if (!install_page)
+              exit(-1);
+          }
+          break;
         }
-        break;
       }
     }
+
+    file_seek(file, 0);
   }
-  file_seek(file, 0);
-  return true;
+  return new_page;
 }
 
 struct spage * lookup_spage(uint8_t* upage) {
