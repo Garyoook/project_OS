@@ -23,46 +23,30 @@ void init_swap_block(){
 }
 
 block_sector_t write_to_swap(void* page, struct swap_entry* swapEntry) {
-
-//  char hello[10] = "nihao";
-//  block_write(b, 0, hello);
-//  char nihao[10];
-//  block_read(b, 0, nihao);
-//  printf("%lalalalal--------%s", nihao);
   lock_acquire(&swap_lock);
   size_t start = bitmap_scan(bmap, 0, SECTOR_COUNT, 0);
   bitmap_set_multiple(bmap, start, SECTOR_COUNT, 1);
   lock_release(&swap_lock);
-//  swapEntry->blockSector = start;
-//block_print_stats();
-//  printf("qqq: %d\n", start);
   for (int i = 0; i < SECTOR_COUNT; i++) {
     lock_acquire(&block_lock);
     block_write(b, (block_sector_t) start + i, page + i * BLOCK_SECTOR_SIZE);
     lock_release(&block_lock);
   }
-
   return (block_sector_t) start;
 }
 
-void read_from_swap(void* uspage,void* kepage) {
-//  printf("%xaaaaaaaaa\n", uspage);
-  size_t  start = lookup_swap(uspage)->blockSector;
-//  if (start == 904) printf(" %p\n", uspage);
+void read_from_swap(void* upage, void* kpage) {
+  size_t start = lookup_swap(upage)->blockSector;
   lock_acquire(&swap_lock);
   bitmap_set_multiple(bmap, start, SECTOR_COUNT, 0);
-//  printf("%xhelloaaaaaaaaaa\n", lookup_swap(uspage)->blockSector);
 
-  list_remove(&lookup_swap(uspage)->s_elem);
+  list_remove(&lookup_swap(upage)->s_elem);
   lock_release(&swap_lock);
   for (int i = 0; i < SECTOR_COUNT; i++){
-//    printf("%d reads\n", i);
     lock_acquire(&block_lock);
-    block_read(b, (block_sector_t) start+i, kepage + i * BLOCK_SECTOR_SIZE );
+    block_read(b, (block_sector_t) start+i, kpage + i * BLOCK_SECTOR_SIZE );
     lock_release(&block_lock);
   }
-//  printf("fnish read\n");
-
 }
 
 struct swap_entry* lookup_swap(void* upage) {

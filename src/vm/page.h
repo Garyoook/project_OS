@@ -47,4 +47,5 @@ struct spage *create_spage(struct file *file, off_t ofs, uint8_t *upage,
                   uint32_t read_bytes, uint32_t zero_bytes, bool writable);
 struct spage* lookup_spage(uint8_t *upage);
 void spage_destroy(uint8_t* upage);
+
 #endif //PINTOS_47_PAGE_H

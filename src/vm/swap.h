@@ -10,8 +10,7 @@ struct block* b;
 struct bitmap* bmap;
 
 void init_swap_block();
-void read_from_swap(void* something,  void* kepage);
-size_t get_free_slot(size_t size);
+void read_from_swap(void* upage, void* kpage);
 struct list swap_table;
 struct swap_entry{
   void* uspage;
