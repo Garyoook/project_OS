@@ -186,15 +186,20 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
   uint8_t *upage = pg_round_down(fault_addr);
-  printf("fupage: %x\n", fault_addr);
-//  if (lookup_swap(upage) != NULL) {
-//    printf("hello\n");
-//    read_from_swap(upage);
-//  }
   if (!is_user_vaddr(fault_addr) || fault_addr == NULL || fault_addr >= PHYS_BASE
       || fault_addr < (void *) 0x08048000) {
-    exit(-1);
+    exit(0);
   }
+//  printf("fupage: %xu\n", upage);
+  if (lookup_swap(upage) != NULL && lookup_swap(upage)->t_blongs_to == thread_current()) {
+    uint8_t *kp = frame_create(PAL_USER, thread_current(), upage);
+//    printf("pp\n");
+    install_page(upage, kp, true);
+    read_from_swap(upage, kp);
+//    printf("hello\n");
+    return;
+  }
+
 
 
 //  PANIC("DD");

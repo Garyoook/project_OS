@@ -10,7 +10,7 @@ struct block* b;
 struct bitmap* bmap;
 
 void init_swap_block();
-void read_from_swap(void* something);
+void read_from_swap(void* something,  void* kepage);
 size_t get_free_slot(size_t size);
 struct list swap_table;
 struct swap_entry{
@@ -19,7 +19,7 @@ struct swap_entry{
   block_sector_t blockSector;
   struct list_elem s_elem;
 };
-void write_to_swap(void* something, struct swap_entry* swapEntry);
+block_sector_t write_to_swap(void* something, struct swap_entry* swapEntry);
 struct swap_entry* lookup_swap(void* upage);
 
 #endif //PINTOS_47_SWAP_H
