@@ -159,8 +159,7 @@ kill (struct intr_frame *f)
 //}
 
 static void
-page_fault (struct intr_frame *f) 
-{
+page_fault (struct intr_frame *f) {
 
   bool not_present;  /* True: not-present page, false: writing r/o page. */
   bool write;        /* True: access was write, false: access was read. */
@@ -175,9 +174,10 @@ page_fault (struct intr_frame *f)
      [IA32-v3a] 5.15 "Interrupt 14--Page Fault Exception
      (#PF)". */
   asm ("movl %%cr2, %0" : "=r" (fault_addr));
+
   /* Turn interrupts back on (they were only off so that we could
      be assured of reading CR2 before it changed). */
-  intr_enable ();
+  intr_enable();
   /* Count page faults. */
   page_fault_cnt++;
   /* Determine cause. */
@@ -187,7 +187,7 @@ page_fault (struct intr_frame *f)
   uint8_t *upage = pg_round_down(fault_addr);
   if (!is_user_vaddr(fault_addr) || fault_addr == NULL || fault_addr >= PHYS_BASE
       || fault_addr < (void *) 0x08048000) {
-    exit(-1);
+    exit(EXIT_FAIL);
   }
 //  printf("fupage: %xu\n", upage);
   if (lookup_swap(upage) != NULL && lookup_swap(upage)->t_blongs_to == thread_current()) {
@@ -199,17 +199,23 @@ page_fault (struct intr_frame *f)
     return;
   }
 
-  struct spage* spage1 =  lookup_spage(upage);
+
+
+//  PANIC("DD");
+
+  struct spage *spage1 = lookup_spage(upage);
 
   if (spage1 == NULL) {
+
     if (fault_addr >= f->esp - 32 && for_stack_growth) {
       uint8_t *kpage;
       bool success = false;
       kpage = frame_create(PAL_USER, thread_current(), PHYS_BASE - num * PGSIZE);
       if (kpage != NULL) {
-        if (num > 2048) exit(-1);
+        if (num > 2048) {
+          exit(EXIT_FAIL);
+        }
         success = install_page(((uint8_t *) PHYS_BASE) - num * PGSIZE, kpage, true);
-
         if (success) {
           struct spage *s = create_spage(NULL, 0, ((uint8_t *) PHYS_BASE) - num * PGSIZE, 0, 0, false);
           s->kpage = kpage;
@@ -218,13 +224,12 @@ page_fault (struct intr_frame *f)
           thread_current()->stack = PHYS_BASE - PGSIZE;
         } else {
           palloc_free_page(kpage);
-          exit(-1);
+          exit(EXIT_FAIL);
         }
       }
       return;
-    } else {
-//      printf("Exi%d\n", (fault_addr >= f->esp - 32));
-      exit(-1);
+    } else {    printf("Q!%d\n", upage);
+      exit(EXIT_FAIL);
     }
   } else {
 //    PANIC("DD");
@@ -234,7 +239,7 @@ page_fault (struct intr_frame *f)
     off_t ofs = spage1->offset;
     bool writable = spage1->writable;
     if (not_present) {
-      file_seek(spage1->file1, ofs);
+      file_seek(spage1->file_sp, ofs);
       while (read_bytes > 0 || zero_bytes > 0) {
         /* Calculate how to fill this page.
            We will read PAGE_READ_BYTES bytes from FILE
@@ -247,19 +252,20 @@ page_fault (struct intr_frame *f)
         spage1->has_load_in = true;
 
         if (kpage == NULL)
-          exit(-1);
+          exit(EXIT_FAIL);
         spage1->kpage = kpage;
+
         /* Load this page. */
-        if (file_read(spage1->file1, kpage, page_read_bytes) != (int) page_read_bytes) {
+        if (file_read(spage1->file_sp, kpage, page_read_bytes) != (int) page_read_bytes) {
           palloc_free_page(kpage);
-          exit(-1);
+          exit(EXIT_FAIL);
         }
         memset(kpage + page_read_bytes, 0, page_zero_bytes);
 
         /* Add the page to the process's address space. */
         if (!install_page(upage, kpage, writable)) {
           palloc_free_page(kpage);
-          exit(-1);
+          exit(EXIT_FAIL);
         }
 
         /* Advance. */
@@ -269,7 +275,6 @@ page_fault (struct intr_frame *f)
       }
       return;
     }
-
   }
 
   if (thread_current()->in_syscall) {
@@ -281,11 +286,11 @@ page_fault (struct intr_frame *f)
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
-          fault_addr,
-          not_present ? "not present" : "rights violation",
-          write ? "writing" : "reading",
-          user ? "user" : "kernel");
-  kill (f);
+  printf("Page fault at %p: %s error %s page in %s context.\n",
+         fault_addr,
+         not_present ? "not present" : "rights violation",
+         write ? "writing" : "reading",
+         user ? "user" : "kernel");
+  kill(f);
 }
 

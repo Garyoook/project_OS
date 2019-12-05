@@ -14,6 +14,7 @@
 #include "threads/vaddr.h"
 #ifdef USERPROG
 #include "userprog/process.h"
+#include "vm/frame.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -94,6 +95,7 @@ thread_init (void)
   list_init (&ready_list);
   list_init (&all_list);
   list_init (&blocked_list);
+
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();

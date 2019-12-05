@@ -37,7 +37,7 @@ struct spage *create_spage(struct file *file, off_t ofs, uint8_t *upage,
   if (new_page == NULL) {
     return false;
   }
-  new_page->file1 = file;
+  new_page->file_sp = file;
   new_page->offset = ofs;
   new_page->upage = upage;
   new_page->read_bytes = read_bytes;
@@ -55,12 +55,12 @@ struct spage *create_spage(struct file *file, off_t ofs, uint8_t *upage,
       struct thread *t = thread_current();
       hash_first(&i, &t->spage_table);
 
-      while (hash_next(&i)) {
-        struct spage *sp = hash_entry (hash_cur(&i), struct spage, pelem);
-        if (sp == NULL)
-          break;
-        if (file == sp->file1 && !sp->writable) {
-          new_page->kpage = sp->kpage;
+    while (hash_next(&i)) {
+      struct spage *sp = hash_entry (hash_cur(&i), struct spage, pelem);
+      if (sp == NULL)
+        break;
+      if (file == sp->file_sp && !sp->writable) {
+        new_page->kpage = sp->kpage;
 
           if (new_page->kpage != NULL) {
             bool install_page = (pagedir_get_page(t->pagedir, upage) == NULL

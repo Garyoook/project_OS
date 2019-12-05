@@ -95,9 +95,10 @@ syscall_handler (struct intr_frame *f UNUSED)
   void **snd = (void **)(f->esp) + 2;
   void **trd = (void **)(f->esp) + 3;
 
-//  printf("AAAAAAa%d\n", syscall_num);
+// printf("AAAAAAa%d\n", syscall_num);
   switch (syscall_num) {
     case SYS_EXEC:
+      if (!safe_access(fst)) f->eax = (uint32_t) EXIT_FAIL;
       f->eax = (uint32_t) exec(*(char **)fst);
       break;
     case SYS_CLOSE:
@@ -172,8 +173,9 @@ syscall_handler (struct intr_frame *f UNUSED)
 
 pid_t
 exec(const char *cmd_line) {
-  if (!safe_access(cmd_line))
+  if (!safe_access(cmd_line)){
     return EXIT_FAIL;
+  }
   pid_t pid = process_execute(cmd_line);
   return pid;
 }
@@ -495,6 +497,7 @@ mapid_t mmap(int fd, void *addr) {
     }
   }
 
+
   struct thread *cur = thread_current();
   struct list_elem *e = list_begin(&cur->file_fd_list);
   while (e != list_end(&cur->file_fd_list)) {
@@ -510,6 +513,9 @@ mapid_t mmap(int fd, void *addr) {
       return fd;
     }
   }
+
+
+
   return -1;
 }
 
@@ -531,12 +537,16 @@ void munmap(mapid_t mapping) {
           if (load_file_in) {
             printf("");
           }
+
         }
+
+
         fileFd->mmaped = false;
 
         if (!fileFd->reopened)
           file_allow_write(fileFd->f);
         struct spage *page = lookup_spage(fileFd->addr);
+
         int file_size = file_length(fileFd->f);
 
         file_allow_write(fileFd->f);

@@ -18,27 +18,32 @@ void init_swap_block(){
   bitmap_set_all(bmap, 0);
 }
 
-block_sector_t write_to_swap(void* something, struct swap_entry* swapEntry){
-  size_t start = get_free_slot(sizeof(something) / PGSIZE);
-  bitmap_set_multiple(bmap, start, 8, 1);
+block_sector_t write_to_swap(void* page, struct swap_entry* swapEntry){
+
+//  char hello[10] = "nihao";
+//  block_write(b, 0, hello);
+//  char nihao[10];
+//  block_read(b, 0, nihao);
+//  printf("%lalalalal--------%s", nihao);
+  size_t start = get_free_slot(sizeof(page) / PGSIZE);
+  bitmap_set_multiple(bmap, start, SECTORS_PER_PAGE, 1);
 //  swapEntry->blockSector = start;
 //block_print_stats();
 //  printf("qqq: %d\n", start);
-  for (int i = 0; i < 8; i++)
-    block_write(b, (block_sector_t) start+i, something+ i * (PGSIZE/8) );
+  for (int i = 0; i < SECTORS_PER_PAGE; i++)
+    block_write(b, (block_sector_t) start+i, page+ i * (PGSIZE/SECTORS_PER_PAGE) );
 
   return (block_sector_t) start;
 }
 
 void read_from_swap(void* uspage,void* kepage) {
-
 //  printf("%xaaaaaaaaa\n", uspage);
   size_t  start = lookup_swap(uspage)->blockSector;
-  bitmap_set_multiple(bmap, start, 8, 0);
+  bitmap_set_multiple(bmap, start, SECTORS_PER_PAGE, 0);
 //  printf("%xhelloaaaaaaaaaa\n", lookup_swap(uspage)->blockSector);
 
   list_remove(&lookup_swap(uspage)->s_elem);
-  for (int i = 0; i < 8; i++){
+  for (int i = 0; i < SECTORS_PER_PAGE; i++){
 //    printf("%d reads\n", i);
     block_read(b, (block_sector_t) start+i, kepage + i * (PGSIZE/8) );
   }
@@ -47,7 +52,7 @@ void read_from_swap(void* uspage,void* kepage) {
 }
 
 size_t get_free_slot(size_t size){
-  return bitmap_scan(bmap, 0, 8, 0);
+  return bitmap_scan(bmap, 0, SECTORS_PER_PAGE, 0);
 }
 
 struct swap_entry* lookup_swap(void* upage) {

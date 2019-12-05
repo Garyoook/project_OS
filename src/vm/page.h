@@ -22,7 +22,7 @@
 #include "threads/malloc.h"
 
 struct spage{
-  struct file *file1;
+  struct file *file_sp;
   off_t offset;
   uint8_t *upage;
   uint8_t *kpage;

@@ -19,7 +19,7 @@ struct swap_entry{
   block_sector_t blockSector;
   struct list_elem s_elem;
 };
-block_sector_t write_to_swap(void* something, struct swap_entry* swapEntry);
+block_sector_t write_to_swap(void* page, struct swap_entry* swapEntry);
 struct swap_entry* lookup_swap(void* upage);
 
 #endif //PINTOS_47_SWAP_H
