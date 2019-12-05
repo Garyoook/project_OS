@@ -190,6 +190,7 @@ page_fault (struct intr_frame *f) {
     exit(EXIT_FAIL);
   }
 //  printf("fupage: %xu\n", upage);
+//  printf("K!%p\n", upage);
   if (lookup_swap(upage) != NULL && lookup_swap(upage)->t_blongs_to == thread_current()) {
     uint8_t *kp = frame_create(PAL_USER, thread_current(), upage);
 //    printf("pp\n");
@@ -198,6 +199,8 @@ page_fault (struct intr_frame *f) {
 //    printf("hello\n");
     return;
   }
+
+
 
 
 
@@ -228,7 +231,8 @@ page_fault (struct intr_frame *f) {
         }
       }
       return;
-    } else {    printf("Q!%d\n", upage);
+    } else {
+//      printf("Q!%p\n", upage);
       exit(EXIT_FAIL);
     }
   } else {
@@ -238,7 +242,7 @@ page_fault (struct intr_frame *f) {
     uint8_t *upage = spage1->upage;
     off_t ofs = spage1->offset;
     bool writable = spage1->writable;
-    if (not_present) {
+    if (not_present && spage1->file_sp != NULL) {
       file_seek(spage1->file_sp, ofs);
       while (read_bytes > 0 || zero_bytes > 0) {
         /* Calculate how to fill this page.

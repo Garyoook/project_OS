@@ -8,13 +8,13 @@
 #include "devices/block.h"
 #include "page.h"
 
-#define SECTORS_PER_PAGE 8
+#define SECTOR_COUNT (PGSIZE/BLOCK_SECTOR_SIZE)
 
 size_t get_free_slot(size_t size);
 
 void init_swap_block(){
   b = block_get_role(BLOCK_SWAP);
-  bmap = bitmap_create(block_size(b) * 4);
+  bmap = bitmap_create(block_size(b) * 8);
   bitmap_set_all(bmap, 0);
 }
 
@@ -25,13 +25,14 @@ block_sector_t write_to_swap(void* page, struct swap_entry* swapEntry){
 //  char nihao[10];
 //  block_read(b, 0, nihao);
 //  printf("%lalalalal--------%s", nihao);
-  size_t start = get_free_slot(sizeof(page) / PGSIZE);
-  bitmap_set_multiple(bmap, start, SECTORS_PER_PAGE, 1);
+
+  size_t start = bitmap_scan(bmap, 0, SECTOR_COUNT, 0);
+  bitmap_set_multiple(bmap, start, SECTOR_COUNT, 1);
 //  swapEntry->blockSector = start;
 //block_print_stats();
 //  printf("qqq: %d\n", start);
-  for (int i = 0; i < SECTORS_PER_PAGE; i++)
-    block_write(b, (block_sector_t) start+i, page+ i * (PGSIZE/SECTORS_PER_PAGE) );
+  for (int i = 0; i < SECTOR_COUNT; i++)
+    block_write(b, (block_sector_t) start+i, page + i * BLOCK_SECTOR_SIZE );
 
   return (block_sector_t) start;
 }
@@ -39,20 +40,16 @@ block_sector_t write_to_swap(void* page, struct swap_entry* swapEntry){
 void read_from_swap(void* uspage,void* kepage) {
 //  printf("%xaaaaaaaaa\n", uspage);
   size_t  start = lookup_swap(uspage)->blockSector;
-  bitmap_set_multiple(bmap, start, SECTORS_PER_PAGE, 0);
+  bitmap_set_multiple(bmap, start, SECTOR_COUNT, 0);
 //  printf("%xhelloaaaaaaaaaa\n", lookup_swap(uspage)->blockSector);
 
   list_remove(&lookup_swap(uspage)->s_elem);
-  for (int i = 0; i < SECTORS_PER_PAGE; i++){
+  for (int i = 0; i < SECTOR_COUNT; i++){
 //    printf("%d reads\n", i);
-    block_read(b, (block_sector_t) start+i, kepage + i * (PGSIZE/8) );
+    block_read(b, (block_sector_t) start+i, kepage + i * BLOCK_SECTOR_SIZE );
   }
 //  printf("fnish read\n");
 
-}
-
-size_t get_free_slot(size_t size){
-  return bitmap_scan(bmap, 0, SECTORS_PER_PAGE, 0);
 }
 
 struct swap_entry* lookup_swap(void* upage) {

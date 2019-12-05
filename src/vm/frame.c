@@ -33,11 +33,14 @@ void frame_delete(struct frame* frame1){
 }
 
 void frame_evict() {
+
   struct frame *this_frame = list_entry(list_pop_front(&frame_table), struct frame, f_elem);
   struct swap_entry *swapEntry = malloc(sizeof(struct swap_entry));
-//  struct spage *s = lookup_spage(this_frame->upage);
-//  s->in_swap_table = true;
+  if (swapEntry == NULL) {
+    exit(-1);
+  }
   swapEntry->uspage = this_frame->upage;
+//  printf("A%p\n", this_frame->upage);
   swapEntry->blockSector =  write_to_swap(this_frame->page, swapEntry);
 //  printf("Q%x\n", swapEntry->blockSector);
   swapEntry->t_blongs_to = this_frame->t;
