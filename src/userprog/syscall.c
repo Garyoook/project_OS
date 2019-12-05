@@ -95,6 +95,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   void **snd = (void **)(f->esp) + 2;
   void **trd = (void **)(f->esp) + 3;
 
+//  printf("AAAAAAa%d\n", syscall_num);
   switch (syscall_num) {
     case SYS_EXEC:
       f->eax = (uint32_t) exec(*(char **)fst);
@@ -530,28 +531,19 @@ void munmap(mapid_t mapping) {
           if (load_file_in) {
             printf("");
           }
-
         }
-
-
         fileFd->mmaped = false;
 
         if (!fileFd->reopened)
           file_allow_write(fileFd->f);
         struct spage *page = lookup_spage(fileFd->addr);
-
         int file_size = file_length(fileFd->f);
 
         file_allow_write(fileFd->f);
         if (!fileFd->dirty) {
-
           file_write_at(fileFd->f, fileFd->addr, file_size, 0);
-        }file_seek(fileFd->f, 0);
-
-
-//        printf("String to be written in: \n%s\n", temp);
-//        printf("String in target position: \n%s\n", (char *) fileFd->addr);
-
+        }
+        file_seek(fileFd->f, 0);
         pagedir_clear_page(cur->pagedir, fileFd->addr);
         spage_destroy(fileFd->addr);
 

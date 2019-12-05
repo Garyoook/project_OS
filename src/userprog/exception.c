@@ -17,7 +17,6 @@
 #include <string.h>
 #include <kernel/hash.h>
 #include <vm/page.h>
-#include "vm/swap.h"
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
@@ -32,6 +31,7 @@
 #include "threads/vaddr.h"
 #include "syscall.h"
 #include "vm/frame.h"
+#include "vm/swap.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -161,6 +161,7 @@ kill (struct intr_frame *f)
 static void
 page_fault (struct intr_frame *f) 
 {
+
   bool not_present;  /* True: not-present page, false: writing r/o page. */
   bool write;        /* True: access was write, false: access was read. */
   bool user;         /* True: access by user, false: access by kernel. */
@@ -174,7 +175,6 @@ page_fault (struct intr_frame *f)
      [IA32-v3a] 5.15 "Interrupt 14--Page Fault Exception
      (#PF)". */
   asm ("movl %%cr2, %0" : "=r" (fault_addr));
-
   /* Turn interrupts back on (they were only off so that we could
      be assured of reading CR2 before it changed). */
   intr_enable ();
@@ -184,46 +184,48 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
-
-//  printf("1\n");
+  uint8_t *upage = pg_round_down(fault_addr);
   if (!is_user_vaddr(fault_addr) || fault_addr == NULL || fault_addr >= PHYS_BASE
       || fault_addr < (void *) 0x08048000) {
     exit(-1);
   }
+//  printf("fupage: %xu\n", upage);
+  if (lookup_swap(upage) != NULL && lookup_swap(upage)->t_blongs_to == thread_current()) {
+    uint8_t *kp = frame_create(PAL_USER, thread_current(), upage);
+//    printf("pp\n");
+    install_page(upage, kp, true);
+    read_from_swap(upage, kp);
+//    printf("hello\n");
+    return;
+  }
 
-  uint8_t *upage = pg_round_down(fault_addr);
   struct spage* spage1 =  lookup_spage(upage);
 
-
   if (spage1 == NULL) {
-    if (fault_addr >= f->esp - 32) {
-    uint8_t *kpage;
-    bool success = false;
-    kpage = frame_create(PAL_USER, thread_current());
-    if (kpage != NULL)
-    {
-      if (num > 2048) exit(-1);
-      success = install_page (((uint8_t *) PHYS_BASE) - num * PGSIZE, kpage, true);
-      if (success){
-        struct spage *s = create_spage(NULL, 0, ((uint8_t *) PHYS_BASE) - num * PGSIZE, 0, 0, false);
-        s->kpage = kpage;
+    if (fault_addr >= f->esp - 32 && for_stack_growth) {
+      uint8_t *kpage;
+      bool success = false;
+      kpage = frame_create(PAL_USER, thread_current(), PHYS_BASE - num * PGSIZE);
+      if (kpage != NULL) {
+        if (num > 2048) exit(-1);
+        success = install_page(((uint8_t *) PHYS_BASE) - num * PGSIZE, kpage, true);
+
+        if (success) {
+          struct spage *s = create_spage(NULL, 0, ((uint8_t *) PHYS_BASE) - num * PGSIZE, 0, 0, false);
+          s->kpage = kpage;
 //        f->esp = PHYS_BASE - 2 * PGSIZE;
-        num++;
-        thread_current()->stack = PHYS_BASE - PGSIZE;
+          num++;
+          thread_current()->stack = PHYS_BASE - PGSIZE;
+        } else {
+          palloc_free_page(kpage);
+          exit(-1);
+        }
       }
-      else {
-        palloc_free_page(kpage);
-        exit(-1);
-      }
-    }
-    return;} else {
+      return;
+    } else {
+//      printf("Exi%d\n", (fault_addr >= f->esp - 32));
       exit(-1);
     }
-  } else if (spage1->in_swap_table == true) {
-    printf("!\n");
-    uint8_t *kpage;
-    kpage = frame_create(PAL_USER, thread_current());
-    read_from_swap(spage1, kpage);
   } else {
 //    PANIC("DD");
     uint32_t read_bytes = spage1->read_bytes;
@@ -240,13 +242,13 @@ page_fault (struct intr_frame *f)
         size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
         size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-        uint8_t *kpage = frame_create(PAL_USER, thread_current());
+        uint8_t *kpage = frame_create(PAL_USER, thread_current(), upage);
         spage1->kpage = kpage;
         spage1->has_load_in = true;
 
         if (kpage == NULL)
           exit(-1);
-
+        spage1->kpage = kpage;
         /* Load this page. */
         if (file_read(spage1->file1, kpage, page_read_bytes) != (int) page_read_bytes) {
           palloc_free_page(kpage);
@@ -259,6 +261,7 @@ page_fault (struct intr_frame *f)
           palloc_free_page(kpage);
           exit(-1);
         }
+
         /* Advance. */
         read_bytes -= page_read_bytes;
         zero_bytes -= page_zero_bytes;

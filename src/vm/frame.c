@@ -3,58 +3,46 @@
 #include <debug.h>
 #include "threads/thread.h"
 #include <string.h>
-#include "userprog/syscall.h"
+#include "user/syscall.h"
 #include "frame.h"
-#include "swap.h"
-#include "page.h"
 #include "userprog/pagedir.h"
-
+#include "swap.h"
+int k = 0;
 void frame_delete(struct frame* frame1);
 
-void* frame_create(enum palloc_flags flags, struct thread *thread1) {
-  struct frame *f = malloc(sizeof(struct frame));
-  f->page         = palloc_get_page(flags);
+void* frame_create(enum palloc_flags flags, struct thread *thread1, void* upage) {
+    struct frame *f = malloc(sizeof(struct frame));
+    f->page         = palloc_get_page(flags);
+    f->t            = thread1;
+    f->upage        = upage;
   if (f->page == NULL) {
-    eviction();
-    f->page = palloc_get_page(flags);printf("Q%d\n", f->page);
+    frame_evict();
+    f->page = palloc_get_page(flags);
+//    printf("Q%x\n", f->page);
   }
-  f->t            = thread1;
-  list_push_back(&frame_table, &f->f_elem);
-  return f->page;
+    list_push_back(&frame_table, &f->f_elem);
+    return f->page;
 }
 
 void frame_delete(struct frame* frame1){
+  pagedir_clear_page (thread_current()->pagedir, frame1->upage);
+
   palloc_free_page(frame1->page);
   list_remove(&frame1->f_elem);
   free(frame1);
 }
 
-void frame_update() {
+void frame_evict() {
+  struct frame *this_frame = list_entry(list_pop_front(&frame_table), struct frame, f_elem);
+  struct swap_entry *swapEntry = malloc(sizeof(struct swap_entry));
+//  struct spage *s = lookup_spage(this_frame->upage);
+//  s->in_swap_table = true;
+  swapEntry->uspage = this_frame->upage;
+  swapEntry->blockSector =  write_to_swap(this_frame->page, swapEntry);
+//  printf("Q%x\n", swapEntry->blockSector);
+  swapEntry->t_blongs_to = this_frame->t;
+  list_push_back(&swap_table, &swapEntry->s_elem);
+  frame_delete(this_frame);
 }
 
-bool eviction() {
-  //eviction policy
-  struct list_elem *ef = list_pop_front(&frame_table);
-  struct frame *evict_frame = list_entry(ef, struct frame, f_elem);
-  struct swap *s = write_to_swap(evict_frame);
-  palloc_free_page(evict_frame->page);
-
-  struct hash_iterator i;
-  hash_first(&i, &thread_current()->spage_table);
-
-  //Remove references to the frame from any page table that refers to it
-  while (hash_next(&i)) {
-    struct spage *sp = hash_entry (hash_cur(&i), struct spage, pelem);
-    if (sp == NULL) {
-      break;
-    }
-
-    if (sp->kpage == evict_frame->page) {
-      sp->in_swap_table = true;
-      s->sp = sp;
-      return true;
-    }
-  }
-  return false;
-}
 

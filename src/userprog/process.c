@@ -25,10 +25,12 @@
 #define \
   PUSH_STACK(esp, from, size) \
     { \
+        for_stack_growth = false;\
         esp = esp - size;\
         memcpy(esp, from, size);\
         bytes_used += size;\
         check_stack_overflow(bytes_used);\
+        for_stack_growth = true;\
     };
 
 static thread_func start_process NO_RETURN;
@@ -196,8 +198,7 @@ start_process (void *file_name_)
   struct thread *cur = thread_current();
   bool success;
   hash_init(&cur->spage_table , &page_hash, &page_less, NULL);
-// //   swap_table = malloc(sizeof(struct hash));
-//  hash_init(&swap_table, &swap_hash, &swap_less, NULL);
+  list_init(&swap_table);
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -212,11 +213,11 @@ start_process (void *file_name_)
   char *command_name, *save_ptr;
   command_name = strtok_r((char *) s, " ", &save_ptr);
   init_swap_block();
-  list_init(&swap_table);
   success = load (command_name, &if_.eip, &if_.esp);
 
   cur->parent->load_success = success;
   sema_up(&cur->parent->child_load_sema);
+
 
   // if load succeeded we start passing the arguments to the stack:
   if (success) {
@@ -593,13 +594,12 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      uint8_t *kpage = frame_create(PAL_USER, thread_current());
-      s->kpage = kpage;
+      uint8_t *kpage = frame_create(PAL_USER, thread_current(), upage);
 
       if (kpage == NULL)
         return false;
 
-
+      s->kpage = kpage;
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
@@ -631,7 +631,7 @@ setup_stack(void **esp)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = frame_create(PAL_ZERO | PAL_USER, thread_current());
+  kpage = frame_create(PAL_ZERO | PAL_USER, thread_current(), PHYS_BASE - PGSIZE);
 //      palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL)
     {
@@ -665,9 +665,6 @@ install_page (void *upage, void *kpage, bool writable)
 
   /* Verify that there's not already a page at that virtual
      address, then map our page there. */
-//  if (pagedir_get_page(t->pagedir, upage) == NULL) {
-//    lookup_spage(upage)->kpage = kpage;
-//  }
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
