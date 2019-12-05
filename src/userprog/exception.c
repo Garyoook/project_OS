@@ -186,9 +186,10 @@ page_fault(struct intr_frame *f) {
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-
   if (!is_user_vaddr(fault_addr) || fault_addr == NULL || fault_addr >= PHYS_BASE
-      || fault_addr < (void *) 0x08048000) {
+      /*|| fault_addr < (void *) 0x08048000*/) {
+
+//    printf("Fault_addr = %p\n", fault_addr);
     exit(-1);
   }
 
@@ -202,6 +203,8 @@ page_fault(struct intr_frame *f) {
       kpage = frame_create(PAL_USER, thread_current());
       if (kpage != NULL) {
         if (num > 2048) {
+
+//          printf("Fault_addr 1 = %p\n", fault_addr);
           exit(-1);
         }
         success = install_page(((uint8_t *) PHYS_BASE) - num * PGSIZE, kpage, true);
@@ -211,17 +214,20 @@ page_fault(struct intr_frame *f) {
           thread_current()->stack = PHYS_BASE - PGSIZE;
         } else {
           palloc_free_page(kpage);
+
+//          printf("Fault_addr 2 = %p\n", fault_addr);
           exit(-1);
         }
       }
       return;
     } else {
+//      printf("Fault_addr 3 = %p\n", fault_addr);
       exit(-1);
     }
   } else {
     /* reclamation here:*/
     if (sup_page->evicted) {
-      printf("swap index : %d", swap_index_global);
+      printf("swap index : %d\n", (int) swap_index_global);
       read_from_swap(upage, sup_page->swap_index);
     }
 
@@ -244,12 +250,15 @@ page_fault(struct intr_frame *f) {
         sup_page->kpage = kpage;
         sup_page->has_load_in = true;
 
-        if (kpage == NULL)
+        if (kpage == NULL) {
+ //         printf("Fault_addr 4 = %p\n", fault_addr);
           exit(-1);
+        }
 
         /* Load this page. */
         if (file_read(sup_page->file_sp, kpage, page_read_bytes) != (int) page_read_bytes) {
           palloc_free_page(kpage);
+  //        printf("Fault_addr 5 = %p\n", fault_addr);
           exit(-1);
         }
         memset(kpage + page_read_bytes, 0, page_zero_bytes);
@@ -257,6 +266,7 @@ page_fault(struct intr_frame *f) {
         /* Add the page to the process's address space. */
         if (!install_page(sup_upage, kpage, writable)) {
           palloc_free_page(kpage);
+ //         printf("Fault_addr 6 = %p\n", fault_addr);
           exit(-1);
         }
 
@@ -271,6 +281,7 @@ page_fault(struct intr_frame *f) {
   }
 
   if (thread_current()->in_syscall) {
+ //   printf("Fault_addr 7 = %p\n", fault_addr);
     exit(EXIT_FAIL);
   } else if (!user) {
     kill(f);

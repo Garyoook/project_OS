@@ -89,12 +89,13 @@ struct frame *choose_by_evict_policy();
 struct frame *choose_by_evict_policy()
 {
   // random number
-  int list_length = list_size(&frame_table);
-  int r = random_ulong() % list_length;
+  int list_length = (int) list_size(&frame_table);
+  int r = (int) (random_ulong() % list_length);
   if (r < 0) {
     r = -r;
   }
 
+  printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAFFFFFFFFF %d\n", r);
   struct frame * frame_to_evict;
 
   if (!lock_held_by_current_thread(&frame_table_lock)) {
@@ -116,9 +117,6 @@ struct frame *choose_by_evict_policy()
 
 
 bool frame_evict() {
-  bool eviction_success = false;
-
-
   struct frame * frame_to_evict;
   frame_to_evict = choose_by_evict_policy();
 
@@ -139,21 +137,16 @@ bool frame_evict() {
   struct thread * t = frame_to_evict->t;
 
   // swap out
-  size_t index = swap_index_global;
-
-  read_from_swap (spage->upage, index);
+  spage->swap_index = write_to_swap (spage->upage);
 
   // remove reference
   pagedir_clear_page(t->pagedir, spage->upage);
 
-  // free the victim
+  // free the frame
   list_remove(&frame_to_evict->f_elem);
   palloc_free_page(frame_to_evict->kpage);
 
-  spage->is_in_memory = false;
   spage->swapped = true;
-  spage->swap_index = swap_index_global;
-  spage->evicted = false;
 
   // success
   return true;

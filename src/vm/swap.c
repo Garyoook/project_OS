@@ -26,7 +26,6 @@ size_t write_to_swap(void *kpage) {
   for(int i = 0; i < SECTORS_PER_PAGE; i++) {
     block_write(swap_block, (block_sector_t) sector_no + i, kpage + (i * BLOCK_SECTOR_SIZE));
   }
-  swap_index_global = sector_no;              // probably wrong.
   return start;
 }
 
