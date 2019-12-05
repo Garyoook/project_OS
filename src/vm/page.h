@@ -24,7 +24,7 @@ struct spage{
   uint32_t zero_bytes;
   bool writable;
   struct hash_elem pelem;
-  int reclaim_index;         /*index for reclaimation */
+  size_t reclaim_index;         /*index for reclaimation */
   bool evicted;              /*if the mapped frame of this page is evicted or not */
   bool has_load_in;
 };
