@@ -478,14 +478,11 @@ bool overlaps(void* addr){
 
 mapid_t mmap(int fd, void *addr) {
 
-  if (addr > (PHYS_BASE) - num * PGSIZE) {
-    return -1;
-  }
+  if (addr > (PHYS_BASE) - num * PGSIZE) return -1;
 
   if (overlaps(addr)) return -1;
 
   int file_size = filesize(fd);
-
 
   if (fd == 0 || fd == 1 || file_size == 0 || addr == 0 || (uint32_t) addr % PGSIZE != 0) {
     return -1;
@@ -496,7 +493,6 @@ mapid_t mmap(int fd, void *addr) {
       return -1;
     }
   }
-
 
   struct thread *cur = thread_current();
   struct list_elem *e = list_begin(&cur->file_fd_list);
@@ -514,11 +510,8 @@ mapid_t mmap(int fd, void *addr) {
     }
   }
 
-
-
   return -1;
 }
-
 
 void munmap(mapid_t mapping) {
     struct thread *cur = thread_current();
@@ -530,19 +523,22 @@ void munmap(mapid_t mapping) {
           return;
         }
 
-        if (fileFd->addr == NULL)
+        if (fileFd->addr == NULL) {
           return;
+        }
         if (fileFd->mmaped && lookup_spage(fileFd->addr)->has_load_in == false) {
           bool load_file_in = *lookup_spage(fileFd->addr)->upage;
           if (load_file_in) {
             printf("");
           }
+
         }
+
+
         fileFd->mmaped = false;
 
         if (!fileFd->reopened)
           file_allow_write(fileFd->f);
-        struct spage *page = lookup_spage(fileFd->addr);
 
         int file_size = file_length(fileFd->f);
 
@@ -556,6 +552,4 @@ void munmap(mapid_t mapping) {
       }
       e = e->next;
     }
-
-
 }

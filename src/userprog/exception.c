@@ -1,37 +1,19 @@
-#include "userprog/exception.h"
 #include <inttypes.h>
 #include <stdio.h>
-#include "filesys/file.h"
 #include <string.h>
-#include "threads/vaddr.h"
-#include "userprog/gdt.h"
-#include "threads/interrupt.h"
-#include "threads/thread.h"
-#include "syscall.h"
-#include "vm/page.h"
-#include "userprog/process.h"
 #include <debug.h>
-#include <inttypes.h>
-#include <round.h>
-#include <stdio.h>
-#include <string.h>
-#include <kernel/hash.h>
-#include <vm/page.h>
-#include "userprog/gdt.h"
-#include "userprog/pagedir.h"
-#include "userprog/tss.h"
-
 #include "filesys/file.h"
-#include "filesys/filesys.h"
-#include "threads/flags.h"
-#include "threads/interrupt.h"
-#include "threads/palloc.h"
-#include "threads/malloc.h"
-#include "threads/thread.h"
 #include "threads/vaddr.h"
-#include "syscall.h"
+#include "threads/interrupt.h"
+#include "threads/thread.h"
+#include "threads/palloc.h"
+#include "userprog/gdt.h"
+#include "userprog/exception.h"
+#include "userprog/process.h"
+#include "vm/page.h"
 #include "vm/frame.h"
 #include "vm/swap.h"
+#include "syscall.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -159,7 +141,8 @@ kill (struct intr_frame *f)
 //}
 
 static void
-page_fault (struct intr_frame *f) {
+page_fault (struct intr_frame *f) 
+{
 
   bool not_present;  /* True: not-present page, false: writing r/o page. */
   bool write;        /* True: access was write, false: access was read. */
@@ -189,22 +172,12 @@ page_fault (struct intr_frame *f) {
       || fault_addr < (void *) 0x08048000) {
     exit(EXIT_FAIL);
   }
-//  printf("fupage: %xu\n", upage);
-//  printf("K!%p\n", upage);
-//  if (upage == 0x8149000) swap_debug_dump();
-//  printf("bool%d\n", lookup_swap(upage) != NULL );
   if (lookup_swap(upage) != NULL && lookup_swap(upage)->t_blongs_to == thread_current()) {
     struct frame* frame = frame_create(PAL_USER, thread_current(), upage);
-//    printf("pp\n");
     install_page(upage, frame->kpage, true);
     read_from_swap(upage, frame->kpage);
-//    printf("hello\n");
     return;
   }
-
-
-
-//  PANIC("DD");
 
   struct spage* s_page =  lookup_spage(upage);
 
@@ -212,24 +185,23 @@ page_fault (struct intr_frame *f) {
     if (fault_addr >= f->esp - 32 && for_stack_growth) {
     bool success = false;
     struct frame* frame = frame_create(PAL_USER, thread_current(), PHYS_BASE - num * PGSIZE);
-    if (frame->kpage != NULL) {
-      if (num > 2048) {
-        exit(EXIT_FAIL);
+      if (frame->kpage != NULL) {
+        if (num > 2048) {
+          exit(EXIT_FAIL);
+        }
+        success = install_page (((uint8_t *) PHYS_BASE) - num * PGSIZE, frame->kpage, true);
+        if (success) {
+          struct spage *s = create_spage(NULL, 0, ((uint8_t *) PHYS_BASE) - num * PGSIZE, 0, 0, false);
+          s->kpage = frame->kpage;   /* sharing */
+          num++;
+          thread_current()->stack = PHYS_BASE - PGSIZE;
+        } else {
+          palloc_free_page(frame->kpage);
+          exit(EXIT_FAIL);
+        }
       }
-      success = install_page(((uint8_t *) PHYS_BASE) - num * PGSIZE, frame->kpage, true);
-      if (success) {
-        struct spage *s = create_spage(NULL, 0, ((uint8_t *) PHYS_BASE) - num * PGSIZE, 0, 0, false);
-        s->kpage = frame->kpage;   //sharing
-        num++;
-        thread_current()->stack = PHYS_BASE - PGSIZE;
-      } else {
-        palloc_free_page(frame->kpage);
-        exit(EXIT_FAIL);
-      }
-    }
       return;
     } else {
-//      printf("Q!%p\n", upage);
       exit(EXIT_FAIL);
     }
   } else {

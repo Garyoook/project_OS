@@ -14,4 +14,5 @@ void process_activate (void);
 bool install_page (void *upage, void *kpage, bool writable);
 bool setup_stack(void **esp);
 bool for_stack_growth;
+
 #endif /* userprog/process.h */
