@@ -27,7 +27,9 @@ struct frame* frame_create(enum palloc_flags flags, struct thread *t, void* upag
   f->upage        = upage;
 
   if (f->kpage == NULL) {
+    lock_acquire(&filesys_lock);
     frame_evict();
+    lock_release(&filesys_lock);
     f->kpage = palloc_get_page(flags);
   }
 

@@ -28,10 +28,7 @@ void init_swap_block(){
 block_sector_t write_to_swap(void* page, struct swap_entry* swapEntry) {
   lock_acquire(&swap_lock);
   uint32_t start = bitmap_scan(bmap, 0, SECTOR_COUNT, 0);
-//  if (start == 904) printf("GHGHGHGH\n");
   bitmap_set_multiple(bmap, start, SECTOR_COUNT, 1);
-//  last_end += SECTOR_COUNT;
-//  if (start % 8 == 0) printf("FDHHDGHDHD %d\n", start);
   lock_release(&swap_lock);
   for (int i = 0; i < SECTOR_COUNT; i++) {
     lock_acquire(&block_lock);
@@ -42,19 +39,10 @@ block_sector_t write_to_swap(void* page, struct swap_entry* swapEntry) {
 }
 
 void read_from_swap(void* uspage,void* kepage) {
-//  printf("%xaaaaaaaaa\n", uspage);
   size_t  start = lookup_swap(uspage)->blockSector;
   lock_acquire(&swap_lock);
-//  if (start % 8 != 0) printf("FDHHDGHDHD %d\n", start);
-//  if(lookup_swap(uspage)->uspage == 0x8149000) printf("SGSGSGSG\n");
-//  printf("GDHGDUUJ%d\n", start);
-//  if (start == 2058) swap_debug_dump();
   bitmap_set_multiple(bmap, start, SECTOR_COUNT, 0);
 
-//  struct swap_entry *se = lookup_swap(uspage);
-//  if (se == NULL) {
-//    return;
-//  }
   list_remove(&lookup_swap(uspage)->s_elem);
   lock_release(&swap_lock);
   for (int i = 0; i < SECTOR_COUNT; i++){
@@ -62,7 +50,6 @@ void read_from_swap(void* uspage,void* kepage) {
     block_read(b, (block_sector_t) start + i, kepage + i * BLOCK_SECTOR_SIZE);
     lock_release(&block_lock);
   }
-//  printf("written back to kpage = %p, vaddr = %p from block = %d\n", kepage, uspage, start);
 }
 
 struct swap_entry* lookup_swap(void* upage) {
@@ -77,15 +64,4 @@ struct swap_entry* lookup_swap(void* upage) {
     return NULL;
 }
 
-void swap_debug_dump(void)
-{
-  printf("==========SWAP DUMP=================\n");
-  for (struct list_elem *e = list_begin(&swap_table)
-          ; e != list_end(&swap_table)
-          ; e = list_next(e))
-  {
-    struct swap_entry *se = list_entry(e, struct swap_entry, s_elem);
-    printf("vaddr -> %p, owned by thread %s, blocksector = %d\n", se->uspage, se->t_blongs_to, se->blockSector);
-  }
-}
 

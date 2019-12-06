@@ -46,7 +46,7 @@ int currentFd = FD_INIT;
 void
 syscall_init (void)
 {
-  lock_init(&syscall_lock);
+  lock_init(&filesys_lock);
   num = 2;
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
@@ -95,7 +95,6 @@ syscall_handler (struct intr_frame *f UNUSED)
   void **snd = (void **)(f->esp) + 2;
   void **trd = (void **)(f->esp) + 3;
 
-// printf("AAAAAAa%d\n", syscall_num);
   switch (syscall_num) {
     case SYS_EXEC:
       if (!safe_access(fst)) f->eax = (uint32_t) EXIT_FAIL;
@@ -193,8 +192,6 @@ halt(void) {
 
 void
 exit (int status) {
-//  enum intr_level old_level;
-//  old_level = intr_disable();
   struct thread *cur = thread_current();
   // termination message:
   printf("%s: exit(%d)\n", cur->name, status);
@@ -234,11 +231,6 @@ exit (int status) {
     free(fileFd);
   }
 
-  // if exit by an error, release all locks.
-//  if (status == EXIT_FAIL) {
-//    release_all_locks(thread_current());
-//  }
-
   struct hash_iterator i;
   hash_first(&i, &cur->spage_table);
 
@@ -248,16 +240,6 @@ exit (int status) {
       break;
     pagedir_clear_page(cur->pagedir, sp->upage);
   }
-//  struct list_elem *eframe = list_begin(&frame_table);
-//  while (eframe != NULL && eframe != list_end(&frame_table)) {
-//    struct frame *frame1 = list_entry(eframe, struct frame, f_elem);
-//    if (frame1->t == cur) {
-//      pagedir_clear_page(cur->pagedir, frame1->page);
-//    }
-//    eframe = eframe->next;
-//  }
-//  pagedir_destroy(cur->pagedir);
-//  intr_set_level(old_level);
   thread_exit();
 }
 
@@ -296,9 +278,9 @@ open(const char *file) {
   }
 
   if (currentFd <= FILE_LIMIT) {
-    lock_acquire(&syscall_lock);
+    lock_acquire(&filesys_lock);
     currentFd++;
-    lock_release(&syscall_lock);
+    lock_release(&filesys_lock);
 
     // initialize the fields of a created file and push it into
     // the file list of current thread.
