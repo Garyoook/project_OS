@@ -158,6 +158,8 @@ page_fault (struct intr_frame *f) {
      (#PF)". */
   asm ("movl %%cr2, %0" : "=r" (fault_addr));
 
+  lock_acquire(&page_fault_lock);
+
   /* Turn interrupts back on (they were only off so that we could
      be assured of reading CR2 before it changed). */
   intr_enable ();
@@ -177,6 +179,7 @@ page_fault (struct intr_frame *f) {
       struct frame* frame = frame_create(PAL_USER, thread_current(), upage);
       install_page(upage, frame->kpage, true);
       read_from_swap(upage, frame->kpage);
+      lock_release(&page_fault_lock);
       return;
     } else {
       read_from_swap(upage, pagedir_get_page(thread_current()->pagedir, upage));
@@ -186,10 +189,11 @@ page_fault (struct intr_frame *f) {
   struct spage* s_page =  lookup_spage(upage);
 
   if (s_page == NULL) {
-    if (fault_addr >= f->esp - 32 && for_stack_growth) {
+    if (fault_addr >= f->esp - 32 && !for_stack_growth) {
     bool success = false;
     struct frame* frame = frame_create(PAL_USER, thread_current(), PHYS_BASE - num * PGSIZE);
     if (frame->kpage != NULL) {
+      /* a stack limit of 8 MB */
       if (num > 2048) {
         exit(EXIT_FAIL);
       }
@@ -204,6 +208,7 @@ page_fault (struct intr_frame *f) {
         exit(EXIT_FAIL);
       }
     }
+      lock_release(&page_fault_lock);
       return;
     } else {
       exit(EXIT_FAIL);
@@ -252,6 +257,7 @@ page_fault (struct intr_frame *f) {
         zero_bytes -= page_zero_bytes;
         upage_grow += PGSIZE;
       }
+      lock_release(&page_fault_lock);
       return;
     }
 

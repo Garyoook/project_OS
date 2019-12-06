@@ -26,12 +26,12 @@
 #define \
   PUSH_STACK(esp, from, size) \
     { \
-        for_stack_growth = false;\
+        for_stack_growth = true;\
         esp = esp - size;\
         memcpy(esp, from, size);\
         bytes_used += size;\
         check_stack_overflow(bytes_used);\
-        for_stack_growth = true;\
+        for_stack_growth = false;\
     };
 
 static thread_func start_process NO_RETURN;

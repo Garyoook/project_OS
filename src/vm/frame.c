@@ -94,6 +94,7 @@ void frame_evict() {
   lock_release(&eviction_lock);
 }
 
+/* our eviction policy: Second chance eviction */
 struct frame *get_frame_to_evict() {
     struct frame *f;
     struct thread *t;

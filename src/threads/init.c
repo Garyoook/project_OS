@@ -136,6 +136,7 @@ main (void)
 #endif
   list_init(&swap_table);
   init_swap_block();
+  lock_init(&page_fault_lock);
 
   printf ("Boot complete.\n");
 

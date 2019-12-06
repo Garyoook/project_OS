@@ -240,6 +240,19 @@ exit (int status) {
       break;
     pagedir_clear_page(cur->pagedir, sp->upage);
   }
+
+  struct list_elem *frame_e = list_begin(&frame_table);
+  while (frame_e != NULL && frame_e != list_end(&frame_table)){
+    struct frame* f = list_entry(frame_e, struct frame, f_elem);
+    frame_e = frame_e->next;
+    if (f->owner_thread == cur)
+    {
+      palloc_free_page(f->kpage);
+      list_remove(&f->f_elem);
+      free(f);
+    }
+  }
+
   thread_exit();
 }
 

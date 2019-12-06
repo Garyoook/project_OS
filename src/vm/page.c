@@ -56,28 +56,28 @@ struct spage *create_spage(struct file *file, off_t ofs, uint8_t *upage,
   lock_release(&spage_lock);
   if (file != NULL) {
     /* sharing */
-//    if (!writable) {
-//      struct hash_iterator i;
-//      struct thread *t = thread_current();
-//      hash_first(&i, &t->spage_table);
-//
-//      while (hash_next(&i)) {
-//        struct spage *sp = hash_entry (hash_cur(&i), struct spage, pelem);
-//        if (sp == NULL)
-//          break;
-//        if (file == sp->file_sp && !sp->writable) {
-//          new_page->kpage = sp->kpage;
-//
-//          if (new_page->kpage != NULL) {
-//            bool install_page = (pagedir_get_page(t->pagedir, upage) == NULL
-//                                && pagedir_set_page(t->pagedir, upage, new_page->kpage, writable));
-//            if (!install_page)
-//              exit(EXIT_FAIL);
-//          }
-//          break;
-//        }
-//      }
-//    }
+    if (!writable) {
+      struct hash_iterator i;
+      struct thread *t = thread_current();
+      hash_first(&i, &t->spage_table);
+
+      while (hash_next(&i)) {
+        struct spage *sp = hash_entry (hash_cur(&i), struct spage, pelem);
+        if (sp == NULL)
+          break;
+        if (file == sp->file_sp && !sp->writable) {
+          new_page->kpage = sp->kpage;
+
+          if (new_page->kpage != NULL) {
+            bool install_page = (pagedir_get_page(t->pagedir, upage) == NULL
+                                && pagedir_set_page(t->pagedir, upage, new_page->kpage, writable));
+            if (!install_page)
+              exit(EXIT_FAIL);
+          }
+          break;
+        }
+      }
+    }
 
     file_seek(file, 0);
   }
