@@ -10,7 +10,6 @@
 
 #define SECTOR_COUNT (PGSIZE/BLOCK_SECTOR_SIZE)
 
-size_t last_end;
 
 size_t get_free_slot(size_t size);
 struct lock swap_lock;
@@ -22,10 +21,9 @@ void init_swap_block(){
   bitmap_set_all(bmap, 0);
   lock_init(&swap_lock);
   lock_init(&block_lock);
-  last_end = 0;
 }
 
-block_sector_t write_to_swap(void* page, struct swap_entry* swapEntry) {
+block_sector_t write_to_swap(void* page) {
   lock_acquire(&swap_lock);
   uint32_t start = bitmap_scan(bmap, 0, SECTOR_COUNT, 0);
   bitmap_set_multiple(bmap, start, SECTOR_COUNT, 1);
@@ -39,11 +37,13 @@ block_sector_t write_to_swap(void* page, struct swap_entry* swapEntry) {
 }
 
 void read_from_swap(void* uspage,void* kepage) {
-  size_t  start = lookup_swap(uspage)->blockSector;
+  struct swap_entry *swapEntry = lookup_swap(uspage);
+  size_t  start = swapEntry->blockSector;
   lock_acquire(&swap_lock);
   bitmap_set_multiple(bmap, start, SECTOR_COUNT, 0);
 
-  list_remove(&lookup_swap(uspage)->s_elem);
+  list_remove(&swapEntry->s_elem);
+  free(swapEntry);
   lock_release(&swap_lock);
   for (int i = 0; i < SECTOR_COUNT; i++){
     lock_acquire(&block_lock);
@@ -56,7 +56,8 @@ struct swap_entry* lookup_swap(void* upage) {
     struct list_elem *e = list_begin(&swap_table);
     while (e != list_end(&swap_table)){
       struct swap_entry *this_swap = list_entry(e, struct swap_entry, s_elem);
-      if (this_swap->uspage == upage && this_swap->t_blongs_to == thread_current()) {
+      if (this_swap->uspage == upage
+          && this_swap->t_blongs_to == thread_current()) {
         return this_swap;
       }
       e = e->next;

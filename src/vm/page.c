@@ -40,7 +40,7 @@ struct spage *create_spage(struct file *file, off_t ofs, uint8_t *upage,
              uint32_t read_bytes, uint32_t zero_bytes, bool writable){
   struct spage *new_page = malloc(sizeof(struct spage));
   if (new_page == NULL) {
-    return false;
+    exit(EXIT_FAIL);
   }
   new_page->file_sp = file;
   new_page->offset = ofs;

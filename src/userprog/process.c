@@ -118,6 +118,9 @@ static void check_stack_overflow(int used);
 // use this to pass and push the arguments to the stack:
 static bool argument_passing(void **esp, char *file_name) {
   current_file_name = malloc(strlen(file_name) + 1);
+  if (current_file_name == NULL) {
+    exit(-1);
+  }
 // push arguments to the stack;
   enum intr_level old_level;
   old_level = intr_disable();
@@ -595,13 +598,15 @@ bool
 setup_stack(void **esp) {
   bool success = false;
 
-  struct frame *f = frame_create(PAL_ZERO | PAL_USER, thread_current(), PHYS_BASE - PGSIZE);
+  struct frame *f = frame_create(PAL_ZERO | PAL_USER,
+      thread_current(), PHYS_BASE - PGSIZE);
 
   if (f->kpage != NULL) {
     success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, f->kpage, true);
 
       if (success) {
-        struct spage *s = create_spage(NULL, 0, ((uint8_t *) PHYS_BASE) - PGSIZE, 0, 0, false);
+        struct spage *s = create_spage(NULL, 0,
+            ((uint8_t *) PHYS_BASE) - PGSIZE, 0, 0, false);
         s->kpage = f->kpage;
         *esp = PHYS_BASE;
       } else {

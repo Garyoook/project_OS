@@ -20,8 +20,12 @@ void frame_init() {
   lock_init(&eviction_lock);
 }
 
-struct frame* frame_create(enum palloc_flags flags, struct thread *t, void* upage) {
+struct frame* frame_create(enum palloc_flags flags,
+    struct thread *t, void* upage) {
   struct frame *f = malloc(sizeof(struct frame));
+  if (f == NULL) {
+    exit(EXIT_FAIL);
+  }
   f->kpage         = palloc_get_page(flags);
   f->owner_thread  = t;
   f->upage        = upage;
@@ -51,14 +55,14 @@ void frame_delete(struct frame* f){
   lock_release(&frame_lock);
 }
 
-struct frame *lookup_frame(void *frame) {
+struct frame *lookup_frame(void *upage) {
   struct list_elem *e = list_begin(&frame_table);
   while (e != list_end(&frame_table)) {
     struct frame *f = list_entry(e, struct frame, f_elem);
     if (f == NULL) {
       return NULL;
     }
-    if (f->kpage == frame) {
+    if (f->upage == upage) {
       return f;
     }
     e = e->next;
@@ -75,9 +79,8 @@ void frame_evict() {
 
   struct frame *this_frame = get_frame_to_evict();
   struct swap_entry *swapEntry = malloc(sizeof(struct swap_entry));
-
   if (swapEntry == NULL) {
-    exit(-1);
+    exit(EXIT_FAIL);
   }
   while (!is_user_vaddr(this_frame->upage) || is_stack(this_frame->upage)){
     list_push_back(&frame_table, &this_frame->f_elem);
@@ -85,7 +88,7 @@ void frame_evict() {
   }
 
   swapEntry->uspage = this_frame->upage;
-  swapEntry->blockSector =  write_to_swap(this_frame->kpage, swapEntry);
+  swapEntry->blockSector =  write_to_swap(this_frame->kpage);
 
   swapEntry->t_blongs_to = this_frame->owner_thread;
   list_push_back(&swap_table, &swapEntry->s_elem);

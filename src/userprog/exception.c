@@ -191,15 +191,18 @@ page_fault (struct intr_frame *f) {
   if (s_page == NULL) {
     if (fault_addr >= f->esp - 32 && !for_stack_growth) {
     bool success = false;
-    struct frame* frame = frame_create(PAL_USER, thread_current(), PHYS_BASE - num * PGSIZE);
+    struct frame* frame = frame_create(PAL_USER, thread_current(),
+        PHYS_BASE - num * PGSIZE);
     if (frame->kpage != NULL) {
       /* a stack limit of 8 MB */
       if (num > 2048) {
         exit(EXIT_FAIL);
       }
-      success = install_page(((uint8_t *) PHYS_BASE) - num * PGSIZE, frame->kpage, true);
+      success = install_page(((uint8_t *) PHYS_BASE) - num * PGSIZE,
+          frame->kpage, true);
       if (success) {
-        struct spage *s = create_spage(NULL, 0, ((uint8_t *) PHYS_BASE) - num * PGSIZE, 0, 0, false);
+        struct spage *s = create_spage(NULL, 0,
+            ((uint8_t *) PHYS_BASE) - num * PGSIZE, 0, 0, false);
         s->kpage = frame->kpage;   //sharing
         num++;
         thread_current()->stack = PHYS_BASE - PGSIZE;
@@ -229,7 +232,8 @@ page_fault (struct intr_frame *f) {
         size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
         size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-        struct frame *frame = frame_create(PAL_USER, thread_current(), upage_grow);
+        struct frame *frame = frame_create(PAL_USER,
+            thread_current(), upage_grow);
         s_page->kpage = frame->kpage;
         s_page->has_load_in = true;
 
@@ -240,7 +244,8 @@ page_fault (struct intr_frame *f) {
         s_page->kpage = frame->kpage; // sgaring
 
         /* Load this page. */
-        if (file_read(s_page->file_sp, frame->kpage, page_read_bytes) != (int) page_read_bytes) {
+        if (file_read(s_page->file_sp, frame->kpage,
+            page_read_bytes) != (int) page_read_bytes) {
           palloc_free_page(frame->kpage);
           exit(EXIT_FAIL);
         }

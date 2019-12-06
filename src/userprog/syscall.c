@@ -16,17 +16,18 @@
 #include "devices/input.h"
 #include "threads/malloc.h"
 #include "vm/page.h"
+#include "vm/swap.h"
 
 #define FILE_LIMIT 128
 #define FD_INIT 2
 
 static void syscall_handler (struct intr_frame *);
 
-// note that we did not use release_all_locks() because we have
-// dealt with all the locks in exit(), keep using it will cause kernel panic;
+/* note that we did not use release_all_locks() because we have
+  dealt with all the locks in exit(), keep using it will cause kernel panic; */
 void release_all_locks(struct thread *t);
 
-// a struct to keep track of a file with its name, fd, tid and open status.
+/* a struct to keep track of a file with its name, fd, tid and open status. */
 struct fileWithFd {
   struct file *f;
   const char *name;
@@ -40,7 +41,7 @@ struct fileWithFd {
   struct list_elem file_elem;
 };
 
-// the initial file descriptor number;
+/* the initial file descriptor number; */
 int currentFd = FD_INIT;
 
 void
@@ -51,7 +52,7 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
-// for user access memory
+/* for user access memory */
 bool safe_access(void const *esp) {
   return (is_user_vaddr(esp) &&
     pagedir_get_page(thread_current()->pagedir, esp) &&
@@ -78,19 +79,19 @@ void release_all_locks(struct thread *t){
 static void
 syscall_handler (struct intr_frame *f UNUSED)
 {
-  // check esp is valid:
+  /* check esp is valid: */
   if (!safe_access(f->esp)) exit(EXIT_FAIL);
 
   struct thread *t = thread_current();
-  // mark the thread as "in syscall" for exception checking;
+  /* mark the thread as "in syscall" for exception checking;*/
   t->in_syscall = true;
 
-  // syscall is at the top of stack now:
+  /* syscall is at the top of stack now: */
   int syscall_num;
   syscall_num = *(int *)f->esp;
 
-  // get all 3 possible arguments
-  // would'nt affect anything if not all of them are arguments in this syscall
+  /* get all 3 possible arguments
+   would'nt affect anything if not all of them are arguments in this syscall */
   void **fst = (void **)(f->esp) + 1;
   void **snd = (void **)(f->esp) + 2;
   void **trd = (void **)(f->esp) + 3;
@@ -193,7 +194,7 @@ halt(void) {
 void
 exit (int status) {
   struct thread *cur = thread_current();
-  // termination message:
+  /* termination message: */
   printf("%s: exit(%d)\n", cur->name, status);
 
   struct thread *parent = cur->parent;
@@ -210,7 +211,7 @@ exit (int status) {
     }
   }
 
-  // free the child list;
+  /* free the child list; */
   struct list_elem *e = list_begin(&cur->child_list);
   while (e != list_end(&cur->child_list)){
     struct child *thr_child = list_entry(e, struct child, child_elem);
@@ -219,7 +220,7 @@ exit (int status) {
     free(thr_child);
   }
 
-  // free the file list;
+  /* free the file list; */
   struct list_elem *ef = list_begin(&cur->file_fd_list);
   while (ef != NULL && ef != list_end(&cur->file_fd_list)){
     struct fileWithFd *fileFd = list_entry(ef, struct fileWithFd, file_elem);
@@ -247,9 +248,18 @@ exit (int status) {
     frame_e = frame_e->next;
     if (f->owner_thread == cur)
     {
-      palloc_free_page(f->kpage);
-      list_remove(&f->f_elem);
-      free(f);
+      frame_delete(f);
+    }
+  }
+
+  struct list_elem *se = list_begin(&swap_table);
+  while (se != NULL && se != list_end(&swap_table)){
+    struct swap_entry* swapEntry = list_entry(se, struct swap_entry, s_elem);
+    se = se->next;
+    if (swapEntry->t_blongs_to == cur)
+    {
+      list_remove(&swapEntry->s_elem);
+      free(swapEntry);
     }
   }
 
@@ -295,8 +305,8 @@ open(const char *file) {
     currentFd++;
     lock_release(&filesys_lock);
 
-    // initialize the fields of a created file and push it into
-    // the file list of current thread.
+    /* initialize the fields of a created file and push it into
+       the file list of current thread. */
     struct fileWithFd *fileFd =
         (struct fileWithFd *) malloc(sizeof(struct fileWithFd));
     if (fileFd == NULL) {
@@ -480,7 +490,8 @@ mapid_t mmap(int fd, void *addr) {
   int file_size = filesize(fd);
 
 
-  if (fd == 0 || fd == 1 || file_size == 0 || addr == 0 || (uint32_t) addr % PGSIZE != 0) {
+  if (fd == 0 || fd == 1 || file_size == 0
+      || addr == 0 || (uint32_t) addr % PGSIZE != 0) {
     return -1;
   }
 
@@ -501,7 +512,8 @@ mapid_t mmap(int fd, void *addr) {
       fileFd->mmaped = true;
       uint32_t zero_set = ((uint32_t)file_size) % PGSIZE;
       struct spage *s = create_spage(fileFd->f, file_tell(fileFd->f), addr,
-                        (uint32_t) file_length(fileFd->f), PGSIZE - zero_set, true);
+                        (uint32_t) file_length(fileFd->f),
+                        PGSIZE - zero_set, true);
       s->md = fd;
       return fd;
     }
@@ -534,7 +546,6 @@ void munmap(mapid_t mapping) {
 
         if (!fileFd->reopened)
           file_allow_write(fileFd->f);
-//        struct spage *page = lookup_spage(fileFd->addr);
 
         int file_size = file_length(fileFd->f);
 
@@ -545,6 +556,10 @@ void munmap(mapid_t mapping) {
         file_seek(fileFd->f, 0);
         pagedir_clear_page(cur->pagedir, fileFd->addr);
         spage_destroy(fileFd->addr);
+        struct frame *f = lookup_frame(fileFd->addr);
+        if (f != NULL && f->owner_thread == cur) {
+          frame_delete(f);
+        }
       }
       e = e->next;
     }
