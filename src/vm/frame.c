@@ -1,7 +1,7 @@
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include <string.h>
-#include "user/syscall.h"
+#include "userprog/syscall.h"
 #include "frame.h"
 #include "userprog/pagedir.h"
 #include "swap.h"
@@ -26,7 +26,9 @@ struct frame* frame_create(enum palloc_flags flags, struct thread *t, void* upag
   f->pinned       = false;
 
   if (f->kpage == NULL) {
+    lock_acquire(&filesys_lock);
     frame_evict();
+    lock_release(&filesys_lock);
     f->kpage = palloc_get_page(flags);
   }
 
