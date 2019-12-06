@@ -641,16 +641,15 @@ setup_stack(void **esp) {
   }
       if (success) {
         struct spage *s = create_spage(NULL, 0, ((uint8_t *) PHYS_BASE) - PGSIZE, 0, 0, false);
-        s->kpage = kpage;
+        s->kpage = f->kpage;
         *esp = PHYS_BASE;
       } else {
         palloc_free_page(f->kpage);
         return success;
       }
-    }
-
   return success;
 }
+
 
 /* Adds a mapping from user virtual address UPAGE to kernel
    virtual address KPAGE to the page table.
