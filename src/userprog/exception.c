@@ -187,16 +187,21 @@ page_fault (struct intr_frame *f) {
   uint8_t *upage = pg_round_down(fault_addr);
   if (!is_user_vaddr(fault_addr) || fault_addr == NULL || fault_addr >= PHYS_BASE
       || fault_addr < (void *) 0x08048000) {
+//    printf("fault addr at:%p\n", fault_addr);
+//    printf("proper page fault\n");
     exit(EXIT_FAIL);
+    PANIC("nmlgb");
   }
 //  printf("fupage: %xu\n", upage);
-  printf("K!%p\n", upage);
-  if (upage == 0x8149000) printf("zoule\n");
- if (upage == 0x8149000) swap_debug_dump();
+//  printf("K!%p\n", upage);
+//  if (upage == 0x8149000) printf("zoule\n");
+// if (upage == 0x8149000) swap_debug_dump();
 //  printf("bool%d\n", lookup_swap(upage) != NULL );
   if (lookup_swap(upage) != NULL && lookup_swap(upage)->t_blongs_to == thread_current()) {
     if (pagedir_get_page(thread_current()->pagedir, upage) == NULL) {
       struct frame* frame = frame_create(PAL_USER, thread_current(), upage);
+//      struct spage *s = lookup_spage(upage);
+//      if (s != NULL) {s->kpage = frame->kpage; printf("hesdbehbf\n");}
       install_page(upage, frame->kpage, true);
       read_from_swap(upage, frame->kpage);
       return;
@@ -213,6 +218,7 @@ page_fault (struct intr_frame *f) {
     struct frame* frame = frame_create(PAL_USER, thread_current(), PHYS_BASE - num * PGSIZE);
     if (frame->kpage != NULL) {
       if (num > 2048) {
+//        printf("stack overflow\n");
         exit(EXIT_FAIL);
       }
       success = install_page(((uint8_t *) PHYS_BASE) - num * PGSIZE, frame->kpage, true);
@@ -223,6 +229,7 @@ page_fault (struct intr_frame *f) {
         thread_current()->stack = PHYS_BASE - PGSIZE;
       } else {
         palloc_free_page(frame->kpage);
+//        printf("install page fail\n");
         exit(EXIT_FAIL);
       }
     }
@@ -252,12 +259,16 @@ page_fault (struct intr_frame *f) {
         s_page->has_load_in = true;
 
         if (frame->kpage == NULL)
+        {
+//          printf("frame kpage null fail\n");
           exit(EXIT_FAIL);
+        }
         s_page->kpage = frame->kpage; // sgaring
 
         /* Load this page. */
         if (file_read(s_page->file_sp, frame->kpage, page_read_bytes) != (int) page_read_bytes) {
           palloc_free_page(frame->kpage);
+//          printf("read fail\n");
           exit(EXIT_FAIL);
         }
         memset(frame->kpage + page_read_bytes, 0, page_zero_bytes);
@@ -265,6 +276,7 @@ page_fault (struct intr_frame *f) {
         /* Add the page to the process's address space. */
         if (!install_page(upage_grow, frame->kpage, writable)) {
           palloc_free_page(frame->kpage);
+          printf("palloc fail\n");
           exit(EXIT_FAIL);
         }
 
@@ -279,6 +291,7 @@ page_fault (struct intr_frame *f) {
   }
 
   if (thread_current()->in_syscall) {
+//    printf("insyscall\n");
     exit(EXIT_FAIL);
   } else if (!user) {
     kill(f);

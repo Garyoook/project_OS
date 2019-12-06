@@ -1,6 +1,8 @@
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include <string.h>
+#include "userprog/syscall.h"
+#include "threads/vaddr.h"
 #include "user/syscall.h"
 #include "frame.h"
 #include "userprog/pagedir.h"
@@ -41,7 +43,7 @@ struct frame* frame_create(enum palloc_flags flags, struct thread *thread1, void
 
 void frame_delete(struct frame* f){
   lock_acquire(&frame_lock);
-  pagedir_clear_page (thread_current()->pagedir, f->upage);
+  pagedir_clear_page (f->owner_thread->pagedir, f->upage);
 
   palloc_free_page(f->kpage);
   list_remove(&f->f_elem);
@@ -64,6 +66,9 @@ struct frame *lookup_frame(void *frame) {
   return NULL;
 }
 
+bool is_stack(void* addr){
+  return addr > PHYS_BASE - num * PGSIZE;
+}
 
 void frame_evict() {
   lock_acquire(&eviction_lock);
@@ -74,14 +79,18 @@ void frame_evict() {
   if (swapEntry == NULL) {
     exit(-1);
   }
+  while (!is_user_vaddr(this_frame->upage) || is_stack(this_frame->upage)){
+    list_push_back(&frame_table, &this_frame->f_elem);
+    this_frame = get_frame_to_evict();
+  }
 
   swapEntry->uspage = this_frame->upage;
   swapEntry->blockSector =  write_to_swap(this_frame->kpage, swapEntry);
-  if (this_frame->upage == 0x8149000) printf("===== evicted here!\n");
+//  if (this_frame->upage == 0x8149000) printf("===== evicted here!\n");
   //  printf("Q%x\n", swapEntry->blockSector);
   swapEntry->t_blongs_to = this_frame->owner_thread;
   list_push_back(&swap_table, &swapEntry->s_elem);
-  if (this_frame->upage == 0x8149000) swap_debug_dump();
+//  if (this_frame->upage == 0x8149000) swap_debug_dump();
   frame_delete(this_frame);
 
   lock_release(&eviction_lock);

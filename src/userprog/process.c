@@ -584,41 +584,41 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
-  struct spage *s = create_spage(file, ofs, upage, read_bytes, zero_bytes, writable);
-  file_seek (file, ofs);
-  while (read_bytes > 0 || zero_bytes > 0) {
-    /* Calculate how to fill this page.
-       We will read PAGE_READ_BYTES bytes from FILE
-       and zero the final PAGE_ZERO_BYTES bytes. */
-    size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
-    size_t page_zero_bytes = PGSIZE - page_read_bytes;
-
-    /* Get a page of memory. */
-    struct frame *f = frame_create(PAL_USER, thread_current(), upage);
-    uint8_t *kpage = f->kpage;
-    if (kpage == NULL)
-      return false;
-
-    s->kpage = kpage;
-    /* Load this page. */
-    if (file_read (file, kpage, page_read_bytes) != page_read_bytes) {
-      palloc_free_page (kpage);
-      return false;
-    }
-    memset (kpage + page_read_bytes, 0, page_zero_bytes);
-
-    /* Add the page to the process's address space. */
-    if (!install_page (upage, kpage, writable)) {
-      palloc_free_page (kpage);
-      return false;
-    }
-
-    /* Advance. */
-    read_bytes -= page_read_bytes;
-    zero_bytes -= page_zero_bytes;
-    upage += PGSIZE;
-  }
-  return true;
+  create_spage(file, ofs, upage, read_bytes, zero_bytes, writable);
+//  file_seek (file, ofs);
+//  while (read_bytes > 0 || zero_bytes > 0) {
+//    /* Calculate how to fill this page.
+//       We will read PAGE_READ_BYTES bytes from FILE
+//       and zero the final PAGE_ZERO_BYTES bytes. */
+//    size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+//    size_t page_zero_bytes = PGSIZE - page_read_bytes;
+//
+//    /* Get a page of memory. */
+//    struct frame *f = frame_create(PAL_USER, thread_current(), upage);
+//    uint8_t *kpage = f->kpage;
+//    if (kpage == NULL)
+//      return false;
+//
+//    s->kpage = kpage;
+//    /* Load this page. */
+//    if (file_read (file, kpage, page_read_bytes) != page_read_bytes) {
+//      palloc_free_page (kpage);
+//      return false;
+//    }
+//    memset (kpage + page_read_bytes, 0, page_zero_bytes);
+//
+//    /* Add the page to the process's address space. */
+//    if (!install_page (upage, kpage, writable)) {
+//      palloc_free_page (kpage);
+//      return false;
+//    }
+//
+//    /* Advance. */
+//    read_bytes -= page_read_bytes;
+//    zero_bytes -= page_zero_bytes;
+//    upage += PGSIZE;
+//  }
+  return *upage;
 }
 
 /* Create a minimal stack by mapping a zeroed page at the top of

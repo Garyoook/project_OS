@@ -18,7 +18,7 @@ struct lock block_lock;
 
 void init_swap_block(){
   b = block_get_role(BLOCK_SWAP);
-  bmap = bitmap_create(block_size(b));
+  bmap = bitmap_create(block_size(b) * 4);
   bitmap_set_all(bmap, 0);
   lock_init(&swap_lock);
   lock_init(&block_lock);
@@ -27,10 +27,11 @@ void init_swap_block(){
 
 block_sector_t write_to_swap(void* page, struct swap_entry* swapEntry) {
   lock_acquire(&swap_lock);
-  size_t start = bitmap_scan(bmap, 0, SECTOR_COUNT, 0);
+  uint32_t start = bitmap_scan(bmap, 0, SECTOR_COUNT, 0);
 //  if (start == 904) printf("GHGHGHGH\n");
   bitmap_set_multiple(bmap, start, SECTOR_COUNT, 1);
-  last_end += SECTOR_COUNT;
+//  last_end += SECTOR_COUNT;
+//  if (start % 8 == 0) printf("FDHHDGHDHD %d\n", start);
   lock_release(&swap_lock);
   for (int i = 0; i < SECTOR_COUNT; i++) {
     lock_acquire(&block_lock);
@@ -44,9 +45,10 @@ void read_from_swap(void* uspage,void* kepage) {
 //  printf("%xaaaaaaaaa\n", uspage);
   size_t  start = lookup_swap(uspage)->blockSector;
   lock_acquire(&swap_lock);
-
-  printf("GDHGDUUJ%d\n", start);
-  if (start == 2058) swap_debug_dump();
+//  if (start % 8 != 0) printf("FDHHDGHDHD %d\n", start);
+//  if(lookup_swap(uspage)->uspage == 0x8149000) printf("SGSGSGSG\n");
+//  printf("GDHGDUUJ%d\n", start);
+//  if (start == 2058) swap_debug_dump();
   bitmap_set_multiple(bmap, start, SECTOR_COUNT, 0);
 
 //  struct swap_entry *se = lookup_swap(uspage);
@@ -57,10 +59,10 @@ void read_from_swap(void* uspage,void* kepage) {
   lock_release(&swap_lock);
   for (int i = 0; i < SECTOR_COUNT; i++){
     lock_acquire(&block_lock);
-    block_read(b, (block_sector_t) start+i, kepage + i * BLOCK_SECTOR_SIZE);
+    block_read(b, (block_sector_t) start + i, kepage + i * BLOCK_SECTOR_SIZE);
     lock_release(&block_lock);
   }
-  printf("written back to kpage = %p, vaddr = %p from block = %d\n", kepage, uspage, start);
+//  printf("written back to kpage = %p, vaddr = %p from block = %d\n", kepage, uspage, start);
 }
 
 struct swap_entry* lookup_swap(void* upage) {
