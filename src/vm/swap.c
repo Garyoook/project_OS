@@ -10,22 +10,28 @@
 
 #define SECTOR_COUNT (PGSIZE/BLOCK_SECTOR_SIZE)
 
+size_t last_end;
+
 size_t get_free_slot(size_t size);
 struct lock swap_lock;
 struct lock block_lock;
 
 void init_swap_block(){
   b = block_get_role(BLOCK_SWAP);
-  bmap = bitmap_create(block_size(b) * 8);
+  bmap = bitmap_create(block_size(b) * 4);
   bitmap_set_all(bmap, 0);
   lock_init(&swap_lock);
   lock_init(&block_lock);
+  last_end = 0;
 }
 
 block_sector_t write_to_swap(void* page, struct swap_entry* swapEntry) {
   lock_acquire(&swap_lock);
-  size_t start = bitmap_scan(bmap, 0, SECTOR_COUNT, 0);
+  uint32_t start = bitmap_scan(bmap, 0, SECTOR_COUNT, 0);
+//  if (start == 904) printf("GHGHGHGH\n");
   bitmap_set_multiple(bmap, start, SECTOR_COUNT, 1);
+//  last_end += SECTOR_COUNT;
+//  if (start % 8 == 0) printf("FDHHDGHDHD %d\n", start);
   lock_release(&swap_lock);
   for (int i = 0; i < SECTOR_COUNT; i++) {
     lock_acquire(&block_lock);
@@ -35,18 +41,28 @@ block_sector_t write_to_swap(void* page, struct swap_entry* swapEntry) {
   return (block_sector_t) start;
 }
 
-void read_from_swap(void* upage, void* kpage) {
-  size_t start = lookup_swap(upage)->blockSector;
+void read_from_swap(void* uspage,void* kepage) {
+//  printf("%xaaaaaaaaa\n", uspage);
+  size_t  start = lookup_swap(uspage)->blockSector;
   lock_acquire(&swap_lock);
+//  if (start % 8 != 0) printf("FDHHDGHDHD %d\n", start);
+//  if(lookup_swap(uspage)->uspage == 0x8149000) printf("SGSGSGSG\n");
+//  printf("GDHGDUUJ%d\n", start);
+//  if (start == 2058) swap_debug_dump();
   bitmap_set_multiple(bmap, start, SECTOR_COUNT, 0);
 
-  list_remove(&lookup_swap(upage)->s_elem);
+//  struct swap_entry *se = lookup_swap(uspage);
+//  if (se == NULL) {
+//    return;
+//  }
+  list_remove(&lookup_swap(uspage)->s_elem);
   lock_release(&swap_lock);
   for (int i = 0; i < SECTOR_COUNT; i++){
     lock_acquire(&block_lock);
-    block_read(b, (block_sector_t) start+i, kpage + i * BLOCK_SECTOR_SIZE );
+    block_read(b, (block_sector_t) start + i, kepage + i * BLOCK_SECTOR_SIZE);
     lock_release(&block_lock);
   }
+//  printf("written back to kpage = %p, vaddr = %p from block = %d\n", kepage, uspage, start);
 }
 
 struct swap_entry* lookup_swap(void* upage) {
@@ -65,8 +81,8 @@ void swap_debug_dump(void)
 {
   printf("==========SWAP DUMP=================\n");
   for (struct list_elem *e = list_begin(&swap_table)
-      ; e != list_end(&swap_table)
-      ; e = list_next(e))
+          ; e != list_end(&swap_table)
+          ; e = list_next(e))
   {
     struct swap_entry *se = list_entry(e, struct swap_entry, s_elem);
     printf("vaddr -> %p, owned by thread %s, blocksector = %d\n", se->uspage, se->t_blongs_to, se->blockSector);

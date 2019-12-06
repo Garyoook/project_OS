@@ -1,6 +1,8 @@
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include <string.h>
+#include "userprog/syscall.h"
+#include "threads/vaddr.h"
 #include "user/syscall.h"
 #include "frame.h"
 #include "userprog/pagedir.h"
@@ -23,7 +25,6 @@ struct frame* frame_create(enum palloc_flags flags, struct thread *t, void* upag
   f->kpage         = palloc_get_page(flags);
   f->owner_thread  = t;
   f->upage        = upage;
-  f->pinned       = false;
 
   if (f->kpage == NULL) {
     frame_evict();
@@ -37,20 +38,21 @@ struct frame* frame_create(enum palloc_flags flags, struct thread *t, void* upag
   return f;
 }
 
-void frame_delete(struct frame* frame){
-  lock_acquire(&frame_lock);
-  pagedir_clear_page (thread_current()->pagedir, frame->upage);
 
-  palloc_free_page(frame->kpage);
-  list_remove(&frame->f_elem);
-  free(frame);
+void frame_delete(struct frame* f){
+  lock_acquire(&frame_lock);
+  pagedir_clear_page (f->owner_thread->pagedir, f->upage);
+
+  palloc_free_page(f->kpage);
+  list_remove(&f->f_elem);
+  free(f);
   lock_release(&frame_lock);
 }
 
 struct frame *lookup_frame(void *frame) {
   struct list_elem *e = list_begin(&frame_table);
   while (e != list_end(&frame_table)) {
-    struct frame * f = list_entry(e, struct frame, f_elem);
+    struct frame *f = list_entry(e, struct frame, f_elem);
     if (f == NULL) {
       return NULL;
     }
@@ -62,14 +64,27 @@ struct frame *lookup_frame(void *frame) {
   return NULL;
 }
 
+bool is_stack(void* addr){
+  return addr > PHYS_BASE - num * PGSIZE;
+}
 
 void frame_evict() {
   lock_acquire(&eviction_lock);
 
   struct frame *this_frame = get_frame_to_evict();
   struct swap_entry *swapEntry = malloc(sizeof(struct swap_entry));
+
+  if (swapEntry == NULL) {
+    exit(-1);
+  }
+  while (!is_user_vaddr(this_frame->upage) || is_stack(this_frame->upage)){
+    list_push_back(&frame_table, &this_frame->f_elem);
+    this_frame = get_frame_to_evict();
+  }
+
   swapEntry->uspage = this_frame->upage;
   swapEntry->blockSector =  write_to_swap(this_frame->kpage, swapEntry);
+
   swapEntry->t_blongs_to = this_frame->owner_thread;
   list_push_back(&swap_table, &swapEntry->s_elem);
   frame_delete(this_frame);

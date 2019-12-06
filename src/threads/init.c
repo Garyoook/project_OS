@@ -97,6 +97,7 @@ main (void)
 
   frame_init();
 
+
   /* Greet user. */
   printf ("Pintos booting with %'"PRIu32" kB RAM...\n",
           init_ram_pages * PGSIZE / 1024);
@@ -133,9 +134,11 @@ main (void)
   locate_block_devices ();
   filesys_init (format_filesys);
 #endif
+  list_init(&swap_table);
+  init_swap_block();
 
   printf ("Boot complete.\n");
-  
+
   /* Run actions specified on kernel command line. */
   run_actions (argv);
 
