@@ -35,6 +35,7 @@ struct fileWithFd {
   bool reopened;
   void* addr;
   bool dirty;
+  bool mmaped;
 
   struct list_elem file_elem;
 };
@@ -45,7 +46,7 @@ int currentFd = FD_INIT;
 void
 syscall_init (void)
 {
-  lock_init(&filesys_lock);
+  lock_init(&syscall_lock);
   num = 2;
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
@@ -94,6 +95,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   void **snd = (void **)(f->esp) + 2;
   void **trd = (void **)(f->esp) + 3;
 
+// printf("AAAAAAa%d\n", syscall_num);
   switch (syscall_num) {
     case SYS_EXEC:
       if (!safe_access(fst)) f->eax = (uint32_t) EXIT_FAIL;
@@ -171,6 +173,9 @@ syscall_handler (struct intr_frame *f UNUSED)
 
 pid_t
 exec(const char *cmd_line) {
+  if (!safe_access(cmd_line)){
+    return EXIT_FAIL;
+  }
   pid_t pid = process_execute(cmd_line);
   return pid;
 }
@@ -230,9 +235,9 @@ exit (int status) {
   }
 
   // if exit by an error, release all locks.
-  if (status == EXIT_FAIL) {
-    release_all_locks(thread_current());
-  }
+//  if (status == EXIT_FAIL) {
+//    release_all_locks(thread_current());
+//  }
 
   struct hash_iterator i;
   hash_first(&i, &cur->spage_table);
@@ -291,9 +296,9 @@ open(const char *file) {
   }
 
   if (currentFd <= FILE_LIMIT) {
-    lock_acquire(&filesys_lock);
+    lock_acquire(&syscall_lock);
     currentFd++;
-    lock_release(&filesys_lock);
+    lock_release(&syscall_lock);
 
     // initialize the fields of a created file and push it into
     // the file list of current thread.
@@ -308,6 +313,7 @@ open(const char *file) {
     fileFd->tid = cur->tid;
     fileFd->reopened = reopened;
     fileFd->dirty = false;
+    fileFd->mmaped = false;
     if (fileFd->reopened) {
       file_reopen(fileFd->f);
     }
@@ -356,9 +362,7 @@ read(int fd, void *buffer, unsigned size) {
           exit(EXIT_FAIL);
         }
       if (fileFd->f != NULL) {
-        lock_acquire(&filesys_lock);
         return file_read(fileFd->f, buffer, size);
-        lock_release(&filesys_lock);
       } else {
         exit(EXIT_FAIL);
       }
@@ -390,9 +394,11 @@ write(int fd, const void *buffer, unsigned size) {
         if (!fileFd->reopened)
           file_allow_write(fileFd->f);
       }
-      lock_acquire(&filesys_lock);
+      if (fileFd->mmaped) {
+        file_seek(fileFd->f, 0);
+      }
+
       int result = file_write(fileFd->f, buffer, size);
-      lock_release(&filesys_lock);
       file_deny_write(fileFd->f);
       fileFd->dirty = true;
       return result;
@@ -439,6 +445,12 @@ close(int fd) {
       if (fileFd->f == NULL || fileFd->tid != cur->tid) {
         return;
       }
+      if (fileFd->mmaped && !lookup_spage(fileFd->addr)->has_load_in){
+        bool load_file_in = *lookup_spage(fileFd->addr)->upage;
+        if (load_file_in) {
+          printf("");
+        }
+      }
       file_close(fileFd->f);
       list_remove(e);
       e = e->next;
@@ -466,14 +478,11 @@ bool overlaps(void* addr){
 
 mapid_t mmap(int fd, void *addr) {
 
-  if (addr > (PHYS_BASE) - num * PGSIZE) {
-    return -1;
-  }
+  if (addr > (PHYS_BASE) - num * PGSIZE) return -1;
 
   if (overlaps(addr)) return -1;
 
   int file_size = filesize(fd);
-
 
   if (fd == 0 || fd == 1 || file_size == 0 || addr == 0 || (uint32_t) addr % PGSIZE != 0) {
     return -1;
@@ -485,7 +494,6 @@ mapid_t mmap(int fd, void *addr) {
     }
   }
 
-
   struct thread *cur = thread_current();
   struct list_elem *e = list_begin(&cur->file_fd_list);
   while (e != list_end(&cur->file_fd_list)) {
@@ -493,17 +501,17 @@ mapid_t mmap(int fd, void *addr) {
     e = e->next;
     if (fd == fileFd->fd){
       fileFd->addr = addr;
+      fileFd->mmaped = true;
       uint32_t zero_set = ((uint32_t)file_size) % PGSIZE;
-      create_spage(fileFd->f, file_tell(fileFd->f), addr, (uint32_t) file_length(fileFd->f), PGSIZE - zero_set, true);
+      struct spage *s = create_spage(fileFd->f, file_tell(fileFd->f), addr,
+                        (uint32_t) file_length(fileFd->f), PGSIZE - zero_set, true);
+      s->md = fd;
       return fd;
     }
   }
 
-
-
   return -1;
 }
-
 
 void munmap(mapid_t mapping) {
     struct thread *cur = thread_current();
@@ -515,34 +523,33 @@ void munmap(mapid_t mapping) {
           return;
         }
 
-        if (fileFd->addr == NULL)
+        if (fileFd->addr == NULL) {
           return;
+        }
+        if (fileFd->mmaped && lookup_spage(fileFd->addr)->has_load_in == false) {
+          bool load_file_in = *lookup_spage(fileFd->addr)->upage;
+          if (load_file_in) {
+            printf("");
+          }
+
+        }
+
+
+        fileFd->mmaped = false;
 
         if (!fileFd->reopened)
           file_allow_write(fileFd->f);
-        struct spage *page = lookup_spage(fileFd->addr);
 
         int file_size = file_length(fileFd->f);
 
         file_allow_write(fileFd->f);
         if (!fileFd->dirty) {
-          lock_acquire(&filesys_lock);
           file_write_at(fileFd->f, fileFd->addr, file_size, 0);
-          lock_release(&filesys_lock);
-        }file_seek(fileFd->f, 0);
-
-
-//        printf("String to be written in: \n%s\n", temp);
-//        printf("String in target position: \n%s\n", (char *) fileFd->addr);
-
+        }
+        file_seek(fileFd->f, 0);
         pagedir_clear_page(cur->pagedir, fileFd->addr);
         spage_destroy(fileFd->addr);
-
-
-
       }
       e = e->next;
     }
-
-
 }
