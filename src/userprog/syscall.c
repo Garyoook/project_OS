@@ -478,9 +478,7 @@ bool overlaps(void* addr){
 
 mapid_t mmap(int fd, void *addr) {
 
-  if (addr > (PHYS_BASE) - num * PGSIZE) {
-    return -1;
-  }
+  if (addr > (PHYS_BASE) - num * PGSIZE) return -1;
 
   if (overlaps(addr)) return -1;
 
@@ -519,7 +517,6 @@ mapid_t mmap(int fd, void *addr) {
   return -1;
 }
 
-
 void munmap(mapid_t mapping) {
     struct thread *cur = thread_current();
     struct list_elem *e = list_begin(&cur->file_fd_list);
@@ -542,7 +539,7 @@ void munmap(mapid_t mapping) {
 
         if (!fileFd->reopened)
           file_allow_write(fileFd->f);
-        struct spage *page = lookup_spage(fileFd->addr);
+//        struct spage *page = lookup_spage(fileFd->addr);
 
         int file_size = file_length(fileFd->f);
 
@@ -556,6 +553,4 @@ void munmap(mapid_t mapping) {
       }
       e = e->next;
     }
-
-
 }

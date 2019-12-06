@@ -197,8 +197,9 @@ start_process (void *file_name_)
   struct intr_frame if_;
   struct thread *cur = thread_current();
   bool success;
-  hash_init(&cur->spage_table , &page_hash, &page_less, NULL);
-  list_init(&swap_table);
+  spage_init();
+//  hash_init(&cur->spage_table , &page_hash, &page_less, NULL);
+
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -212,7 +213,7 @@ start_process (void *file_name_)
   // take the executable name and pass it to load();
   char *command_name, *save_ptr;
   command_name = strtok_r((char *) s, " ", &save_ptr);
-  init_swap_block();
+//  init_swap_block();
   success = load (command_name, &if_.eip, &if_.esp);
 
   cur->parent->load_success = success;
@@ -585,61 +586,55 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
   struct spage *s = create_spage(file, ofs, upage, read_bytes, zero_bytes, writable);
   file_seek (file, ofs);
-  while (read_bytes > 0 || zero_bytes > 0)
-    {
-      /* Calculate how to fill this page.
-         We will read PAGE_READ_BYTES bytes from FILE
-         and zero the final PAGE_ZERO_BYTES bytes. */
-      size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
-      size_t page_zero_bytes = PGSIZE - page_read_bytes;
+  while (read_bytes > 0 || zero_bytes > 0) {
+    /* Calculate how to fill this page.
+       We will read PAGE_READ_BYTES bytes from FILE
+       and zero the final PAGE_ZERO_BYTES bytes. */
+    size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+    size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      /* Get a page of memory. */
-      struct frame * f = frame_create(PAL_USER, thread_current(), upage);
-      uint8_t *kpage = f->kpage;
-      if (kpage == NULL)
-        return false;
+    /* Get a page of memory. */
+    struct frame *f = frame_create(PAL_USER, thread_current(), upage);
+    uint8_t *kpage = f->kpage;
+    if (kpage == NULL)
+      return false;
 
-      s->kpage = kpage;
-      /* Load this page. */
-      if (file_read (file, kpage, page_read_bytes) != page_read_bytes)
-        {
-          palloc_free_page (kpage);
-          return false;
-        }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
-
-      /* Add the page to the process's address space. */
-      if (!install_page (upage, kpage, writable))
-        {
-          palloc_free_page (kpage);
-          return false;
-        }
-
-      /* Advance. */
-      read_bytes -= page_read_bytes;
-      zero_bytes -= page_zero_bytes;
-      upage += PGSIZE;
+    s->kpage = kpage;
+    /* Load this page. */
+    if (file_read (file, kpage, page_read_bytes) != page_read_bytes) {
+      palloc_free_page (kpage);
+      return false;
     }
+    memset (kpage + page_read_bytes, 0, page_zero_bytes);
+
+    /* Add the page to the process's address space. */
+    if (!install_page (upage, kpage, writable)) {
+      palloc_free_page (kpage);
+      return false;
+    }
+
+    /* Advance. */
+    read_bytes -= page_read_bytes;
+    zero_bytes -= page_zero_bytes;
+    upage += PGSIZE;
+  }
   return true;
 }
 
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 bool
-setup_stack(void **esp)
-{
-  uint8_t *kpage;
+setup_stack(void **esp) {
   bool success = false;
 
   struct frame *f = frame_create(PAL_ZERO | PAL_USER, thread_current(), PHYS_BASE - PGSIZE);
-//      palloc_get_page (PAL_USER | PAL_ZERO);
-  if (f->kpage != NULL)
-    {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, f->kpage, true);
+
+  if (f->kpage != NULL) {
+    success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, f->kpage, true);
 
       if (success) {
         struct spage *s = create_spage(NULL, 0, ((uint8_t *) PHYS_BASE) - PGSIZE, 0, 0, false);
-        s->kpage = kpage;
+        s->kpage = f->kpage;
         *esp = PHYS_BASE;
       } else {
         palloc_free_page(f->kpage);

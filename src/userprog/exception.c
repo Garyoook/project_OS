@@ -190,21 +190,20 @@ page_fault (struct intr_frame *f) {
     exit(EXIT_FAIL);
   }
 //  printf("fupage: %xu\n", upage);
-//  printf("K!%p\n", upage);
-//  if (upage == 0x8149000) swap_debug_dump();
+  printf("K!%p\n", upage);
+  if (upage == 0x8149000) printf("zoule\n");
+ if (upage == 0x8149000) swap_debug_dump();
 //  printf("bool%d\n", lookup_swap(upage) != NULL );
   if (lookup_swap(upage) != NULL && lookup_swap(upage)->t_blongs_to == thread_current()) {
-    struct frame* frame = frame_create(PAL_USER, thread_current(), upage);
-//    printf("pp\n");
-    install_page(upage, frame->kpage, true);
-    read_from_swap(upage, frame->kpage);
-//    printf("hello\n");
-    return;
+    if (pagedir_get_page(thread_current()->pagedir, upage) == NULL) {
+      struct frame* frame = frame_create(PAL_USER, thread_current(), upage);
+      install_page(upage, frame->kpage, true);
+      read_from_swap(upage, frame->kpage);
+      return;
+    } else {
+      read_from_swap(upage, pagedir_get_page(thread_current()->pagedir, upage));
+    }
   }
-
-
-
-//  PANIC("DD");
 
   struct spage* s_page =  lookup_spage(upage);
 
@@ -232,8 +231,8 @@ page_fault (struct intr_frame *f) {
 //      printf("Q!%p\n", upage);
       exit(EXIT_FAIL);
     }
+
   } else {
-//    PANIC("DD");
     uint32_t read_bytes = s_page->read_bytes;
     uint32_t zero_bytes = s_page->zero_bytes;
     uint8_t *upage_grow = s_page->upage;
