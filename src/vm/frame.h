@@ -13,7 +13,6 @@ struct frame{
   void* upage;
   void* kpage;
   struct thread* owner_thread;
-  bool pinned;
   struct list_elem f_elem;
 };
 
